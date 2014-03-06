@@ -76,13 +76,19 @@ following perfect entities:
 \begin{figure}
 \centering
 \includegraphics[scale=0.3]{perfect.eps}
-\caption{Perfect nodes and links for Master/Server entities}
+\caption{Master/Server entities in a perfect setup}
 \label{fig:perf}
 \end{figure}
 
 %------------------------------------------------------------------------- 
 \SubSection{Recoverable, replicated Servers with perfect Master}
 \label{subsec:recov}
+
+%------------------------------------------------------------------------- 
+\SubSection{Coordinator/Master responsiblities}
+\label{subsec:recov}
+
+The Coordinator's responsabilities and interface is different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and non-Byzantine processes, the Coordinator can be any of the Servers, thus balancing the load among the servers. The list of servers the Client chooses from is supplied by the Master to the Client and changes every time the group membership changes (i.e. Servers leave or join). 
 
 %------------------------------------------------------------------------- 
 \Section{Algorithms}
@@ -122,7 +128,15 @@ When the Client attempts to {\bf manipulate an existing object} in the {\it perf
 %------------------------------------------------------------------------- 
 \SubSection{Transaction Management and Concurrency Control}
 \label{subsec:transmgt}
-The {\it Flat Transaction} model allows for a client to manipulate objects on multiple servers in a single transaction. With regards to concurrency control {\it Timestamp Ordering} is being chosen.
+The {\it Flat Transaction} model allows for a client to manipulate objects on multiple servers in a single transaction. With regards to concurrency control {\it Timestamp Ordering} is being chosen. Figure \ref{fig:flat} illustrates a flat transaction model setup with a {\it transaction} being executed from the client on 3 servers.
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.2]{flat-transaction.eps}
+\caption{Flat Transaction model between a Client and 3 Servers}
+\label{fig:flat}
+\end{figure}
+
 
 The advantages of choosing {\it Timestamp Ordering} over {\it Two-Phase Locking} or {\it Optimistic Concurrency} options are the following: 
 \begin{itemize}
@@ -131,7 +145,7 @@ The advantages of choosing {\it Timestamp Ordering} over {\it Two-Phase Locking}
 \item Faster conflict resolution when compared to locking - transactions are aborted immediately. 
 \end{itemize}
 
-The following steps are made when performing a transaction: 
+The following steps are made when performing a transaction in the {\bf perfect} environment - assuming no link or process failures: 
 \begin{enumerate}
 \item Client acquires transaction ID from the Master
 \item Client passes TID to the Object Server
@@ -143,8 +157,6 @@ The following steps are made when performing a transaction:
 \item Once completed, all servers acknowledge the commit and Coordinator notifies the Client that it's successful.
 \item Should any of the participant servers be unable or disagree to commit and aborts, the Coordinator will request all the remaining participants to abort. Client will then be notified.
 \end{enumerate}
-
-\SubSection{Deadlock Detection and Abort Recovery}
 
 %------------------------------------------------------------------------- 
 \Section{Footnotes}
