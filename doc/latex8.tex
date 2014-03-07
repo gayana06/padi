@@ -74,7 +74,7 @@ Main differences between the two architectures, perfect and fault-tolerant, are 
 \SubSection{Perfect links and processes}
 \label{subsec:perf}
 As illustrated in Figure \ref{fig:perf}, the architecture consists of the 
-following perfect entities: 
+following entities: 
 \begin{itemize}[noitemsep,nolistsep]
 \item {\bf M} - Master server 
 \item {\bf S} - Object server
@@ -96,27 +96,35 @@ Note that the number of object servers can be varied.
 \SubSection{Coordinator/Master responsiblities}
 \label{subsec:respon}
 
-The Coordinator's responsabilities and interface is different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and processes, the Coordinator can be any of the Servers, thus reducing the Master's load. The list of servers the Client chooses from is supplied by the Master to the Client and it's updated with every Server group membership change.
+The Coordinator's responsabilities and interface are different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and processes, the Coordinator can be any of the Servers, thus reducing the Master's load. The list of servers available to the Client is supplied by the Master and it's updated with every Server group membership change.
+
+The responsibilities below are shared for both scenarios:
+\begin{itemize}[noitemsep,nolistsep]
+\item {\bf M} - Master server 
+\item {\bf S} - Object server
+\item {\bf C} - Client      
+\end{itemize}
 
 %------------------------------------------------------------------------- 
 \Section{Algorithms}
 \label{sec:algor}
-In the subsections below, the steps for the most important parts of the system are enlisted.
+In the subsections below, algorithms for communication, concurrency, deadlock detection and transaction management are enlisted.
 
 %------------------------------------------------------------------------ 
 \SubSection{Communication}
-The following communication occurs {\bf before} the client attempts connection to the Master node - it is the communication exchanged between the Master and the Servers.
+The following communication occurs {\bf before} the Client attempts connection to the Master node - between the Master and the Servers.
+
 \begin{enumerate}
-\item Master boots first followed by the Object Servers bootstrap
+\item Master boots, followed by the Object Servers bootstrapping
 \item During Object Servers bootstrap:
-\begin{enumerate}
+\begin{itemize}[noitemsep, nolistsep]
 \item Master identifies the Object Servers trying to connect
-\item Master assigns a unique name to the Object Servers to be later used as a reference
-\end{enumerate}
-\item Object Servers's heartbeat messages periodically sent to Master. This is useful for replica management i.e. If one of the replicas fail then the objects can be replicated in another replica to always maintain a certain level of availability in the system.
+\item Master assigns a unique name to the Object Servers to later be used as a reference
+\end{itemize}
+\item Object Servers's heartbeat messages periodically being sent to Master. Heartbeats are also used for replica management in the faul-tolerant scenario. Should one of the replicas fail, the objects are replicated in another server in order to maintain a certain level of availability in the system.
 \end{enumerate}
 
-Upon {\bf attempting a transaction} (object storage) the following communication exists between the Client and Master and Object Servers: 
+Upon {\it attempting a transaction} the following communication exists between the Client, Master and Object Servers in a {\bf fault-tolerant} environment: 
 \begin{enumerate}
 \item Client connects to the Master and requests a transaction identifier 
 \item Master maintains a global transaction sequence and returns a unique transaction identifier (TID) to the Client. Furthermore, a list of healthy Object Servers is also returned to the Client. 
@@ -124,7 +132,9 @@ Upon {\bf attempting a transaction} (object storage) the following communication
 \item Client uses the modulo result to connect to the Object Server and store the object representing the tentative versions of the transaction.
 \end{enumerate}
 
-When the Client attempts to {\bf manipulate an existing object} in the {\it perfect} Object Servers, the following communication takes place:
+The main difference between the above steps and the communication in a {\bf perfect} environment is that the TID is not necessarily assigned by the Master, but any of the Servers.
+
+When the Client attempts to {\bf manipulate an existing object} in the {\it perfect} environment, the following communication takes place:
 \begin{enumerate}
 \item Client requests and retrieves TID from Master
 \item Client retrieves object's previously generated unique ID
@@ -135,7 +145,7 @@ When the Client attempts to {\bf manipulate an existing object} in the {\it perf
 %------------------------------------------------------------------------- 
 \SubSection{Transaction Management and Concurrency Control}
 \label{subsec:transmgt}
-The {\it Flat Transaction} model allows for a client to manipulate objects on multiple servers in a single transaction. With regards to concurrency control {\it Timestamp Ordering} is being chosen. Figure \ref{fig:flat} illustrates a flat transaction model setup with a {\it transaction} being executed from the client on 3 servers.
+The {\it Flat Transaction} model allows for a client to manipulate objects on multiple servers in a single transaction. With regards to concurrency control, {\it Timestamp Ordering} will be used for this project. Figure \ref{fig:flat} illustrates a flat transaction model setup with a transaction being executed from the client on 3 servers.
 
 \begin{figure}
 \centering
@@ -146,31 +156,41 @@ The {\it Flat Transaction} model allows for a client to manipulate objects on mu
 
 
 The advantages of choosing {\it Timestamp Ordering} over {\it Two-Phase Locking} or {\it Optimistic Concurrency} options are the following: 
-\begin{itemize}[noitemsep,nolistsep]
+\begin{itemize}[noitemsep, nolistsep]
 \item Deadlock prevention - common with the use of locks
 \item Better performance for transactions with predominantly {\it read} operations \cite{bernstein1987concurrency}
 \item Faster conflict resolution when compared to locking - transactions are aborted immediately.
 \end{itemize}
 
-The following steps are made when performing a transaction in the {\bf perfect} environment - assuming no link or process failures: 
-\begin{enumerate}
-\item Client acquires transaction ID from the Master
+The following steps are made when performing a transaction, as illustrated in Figure \ref{fig:transa} : 
+
+\begin{enumerate}[noitemsep, nolistsep]
+\item Client acquires transaction ID from the Coordinator 
 \item Client passes TID to the Object Server
-\item Object Server calls the Coordinator's(Master's) {\it join()} method along with TID as parameter
+\item Object Server calls the Coordinator's{\it join(TID)}
 \item Client manipulates objects directly on the Object Server
 \item Upon transaction end, Client asks the Coordinator to either {\it Abort} or {\it Commit} 
-\item Coordinator will request each participant server in the transaction to indicate whether it can commit a transaction or not.
-\item If all participants answer {\it yes}, Coordinator issues {\bf doCommit(TID)} command such that each parcipant commits its part of the transaction
+\item Coordinator will request each participant server in the transaction to indicate whether it can commit a transaction or not.{\it (Voting Phase)}
+\item If all participants answer/vote {\it positively}, the Coordinator issues the {\bf doCommit(TID)} command such that each parcipant commits its part of the transaction
 \item Once completed, all servers acknowledge the commit and Coordinator notifies the Client that it's successful.
 \item Should any of the participant servers be unable or disagree to commit and aborts, the Coordinator will request all the remaining participants to abort. Client will then be notified.
 \end{enumerate}
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.2]{transaction.eps}
+\caption{Transaction steps between the Client, Master, Coordinator and Servers}
+\label{fig:transa}
+\end{figure}
+
+
 
 %-------------------------------------------------------------------------
 \SubSection{Timestamp Ordering and Deadlock Detection}
 \label{subsec:dldetect}
 Since timestamp ordering will be used for concurrency control the chances of deadlock occurring are limited.
 Each transaction is assigned a unique timestamp upon start. Each operation in a transaction is validated when it is carried out.
-Should a transaction fail the validation, it is aborted immediately, but can be restarted by the client. The client is issued with a globally unique transaction timestamp by the Coordinator. The servers are jointly responsible for ensuring serial equivalence i.e. if server S1 access an object before server S2, then server S1 is before S2 at all objects. The coordinators must agree on timestamp ordering so as to achieve the same ordering at all the servers. The timestamp will consist of a {\it <local timestamp, server-id> } pair. Timestamps can be kept roughly synchronized by the use of synchronized local physical clocks coordinated by the master.
+Should a transaction fail the validation, it is aborted immediately, but can be restarted by the client. The client is issued with a globally unique transaction timestamp by the Coordinator. The servers are jointly responsible for ensuring serial equivalence i.e. if server S1 access an object before S2, then server S1 is before S2 at all objects. The coordinators must agree on timestamp ordering so as to achieve the same ordering at all the servers. The timestamp will consist of a {\it <local timestamp, server-id> } pair. Timestamps can be kept roughly synchronized by the use of synchronized local physical clocks coordinated by the master.
 
 Conflict resolution will be performed at each operation.
 The basic timestamp ordering rule is based on operation conflicts and is very simple:
@@ -178,13 +198,13 @@ The basic timestamp ordering rule is based on operation conflicts and is very si
 If the resolution is to abort the transaction then the coordinator will be informed and it will abort the transaction at all the participants.
 
 %--------------------------------------------------------------------------
-\SubSection{Fault Tolerant environment}
+\SubSection{Fault Tolerant scenario}
 \label{subsec:faultol}
 In this phase we design to provide fault tolerance for single object server failure. This is an extension for the previous design. The idea is to keep an exact copy of the objects in adjacent server.
 For instance the object stored in Object server S1, should keep the exact copy in the S2 server as a replica. The master server is responsible for keeping track of the replica servers.
 
 When the object server {\bf fails},
-\begin{enumerate}
+\begin{enumerate}[noitemsep, nolistsep]
 \item Master detects the server failure from the absence of the heartbeat message from the object server.
 \item Master server issues a {\it “failure warning notification”} for the servers, so that the current transactions related to the absent server will be aborted.
 Others will continue but new transactions will not be proceeded. (Master block providing TIDs)
@@ -193,7 +213,7 @@ Others will continue but new transactions will not be proceeded. (Master block p
 \end{enumerate}
 
 When the failed server {\bf recovers},
-\begin{enumerate}
+\begin{enumerate}[noitemsep, nolistsep]
 \item Master detects the arrival of a new server.
 \item Master server issues a {\it “New server notification”} for the servers. Once the current pending transactions are completed, stabilizing the servers occur.
 \item Master server coordinates object replication so that the currently available servers share the objects held by the absent server.
