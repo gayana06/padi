@@ -48,10 +48,16 @@
 
 %------------------------------------------------------------------------- 
 \Section{Introduction}
-In the following sections the implementation of a distributed software 
-transactional memory library is presented for two scenarios:\\
-a) perfect Master, Servers and links\\
-b) perfect Master, links and recoverable, sequentially consistent Servers\\
+Due to the revolution in the computing world and marketing strategies, today’s world has moved to cloud based services rather than maintaining their own networks. The cloud service providers are well
+equipped with the hardware and software infrastructure to provide better services because of the aspect of Distributed computing. 
+
+In this model of computing one of the main problems that the providers has to face is the concurrent transactions. How the system behave when multiple users access the same object at the same 
+time and manipulates them. How to maintain the proper order of commit and how to resolve conflicting manipulations. Here in this paper we are going to address this problem deeper and propose 
+a solution which can be implemented and evaluated during next few weeks ahead.
+
+In the following sections the implementation of a distributed software transactional memory library is presented for two scenarios: \\
+a) perfect Master, Servers and links \\
+b) perfect Master, links and recoverable, sequentially \\
 
 Section \ref{sec:arch} introduces an overview of each scenario. Section 
 \ref{sec:algor} discusses the algorithms used for concurrency control, 
@@ -62,42 +68,66 @@ transaction management and Client-Server communication
 \Section{Architecture}
 \label{sec:arch}
 
-The assumption made for all the sections below is that the Master is a perfect process. The names Object Servers and Servers are used interchangeably across the sections below and refer to the any non-Master process participant in a transaction.
-
-Main differences between the two architectures, perfect and fault-tolerant, are the following:
-\begin{itemize}[noitemsep,nolistsep]
-\item for perfect, the Coordinator can be any server, not necessarily the Master
-\item 
-\end{itemize}
-%TODO: Add more differences between the two archs.
-
-%------------------------------------------------------------------------- 
-\SubSection{Perfect links and processes}
-\label{subsec:perf}
-As illustrated in Figure \ref{fig:perf}, the architecture consists of the 
-following entities: 
-\begin{itemize}[noitemsep,nolistsep]
-\item {\bf M} - Master server 
-\item {\bf S} - Object server
-\item {\bf C} - Client      
-\end{itemize}
-
 \begin{figure}
 \centering
 \includegraphics[scale=0.3]{perfect.eps}
 \caption{Master/Server entities in a perfect setup}
 \label{fig:perf}
 \end{figure}
-Note that the number of object servers can be varied.
+
+As illustrated in Figure \ref{fig:perf}, the architecture consists of the 
+following perfect entities: 
+\begin{itemize}[noitemsep,nolistsep]
+\item {\bf M} - Master server 
+\item {\bf S} - Object server
+\item {\bf C} - Client      
+\end{itemize}
+
+We are proposing the system in two phases, where the first phase we assume all the servers and links never fails. The second phase will be an extension to the first phase so that we achieve the fault
+tolerant behavior in the system. Note: In the fault tolerant version we assume only one Object Server (S) to be failed at a time. This failure is not a byzantine failure but only a power crash.
+Once an object server is failed it will take some time to come back to a stable state and during that time period no new transactions are initiated.
+Below figure 1 illustrates a view of the system where three object servers (S) have connected to the Master Server (M).
 %------------------------------------------------------------------------- 
-\SubSection{Recoverable, replicated Servers with perfect Master}
-\label{subsec:recov}
+\SubSection{Phase One, Perfect System}
+\label{sec:phase1}
+According to figure 1, master server (M) being a centralized server in the system, helps the object servers (S) to bootstrap the system. When bootstrap, the master server will keep information such as
+IP address, port of the bootstrapping server and issue valid references so that master can keep track of them. Once Object Servers (S) have joined the system the Clients (C) can connect 
+and start transactions. Transaction Identifiers (TID) should be unique to the whole system therefore the Master server (M) will keep track of the global sequence of TIDs.
+
+Clients (C) are supposed to query the Master Server (M) if the local cache of the client is out dated or the Object Servers (S) in the cache do not respond. The Master Server (M) will 
+provide the latest list of Object Servers(S) so that clients can continue operation.
+
+Objects that are going to be stored in Object Servers (S) have unique identifiers (integer) so that each object can be uniquely identified throughout the system. Therefore in this solution
+we are using the modulo function against the number of Object Servers (S) available in order to find the actual location of the object to be stored or referred.
+
+The clients (C) can connect multiple Object Servers inside a single transaction, hence it is required to have a coordinator in order to manage the transaction operations such as commit and abort.
+Therefore we consider the Master Server (M) as the coordinator. Once a Client (C) needs to manipulate an object it should ask the relevant object server to contact the coordinator (M) and join 
+for the transaction. Then the manipulation operations (Read/Write) can be done by only contacting the Object Servers (S).
+
+%------------------------------------------------------------------------- 
+\SubSection{Phase two, fault tolerant system}
+\label{subsec:phase2}
+This is an extension to the above proposed system, therefore in order to recover from failures, it is required to have an exact replication of the objects in a certain Object Server (S) in 
+another Object Server (S). The Master Server (S) has to take care of the replica location of each server. Here we propose the replica location as a ring, where replica of S1 contains in S2, 
+and replica of S2 contains in S3, etc. Furthermore each Object Server (S) is notified with its replica, by the Master Server (M). The transaction modal is similar to the phase one, the
+only extension required is to ask the replica server as well to join the coordinator for the transaction.
+
+In case of a failure, the Master Server (M) will identify it by the drop of heart beat messages from the server and Master Server would issue a notification to all the Object servers (S) 
+regarding the failure and it will block the issuing of TIDs for the clients until the failure recovered. Once the current transactions is completed, the master will rearrange the system in
+such a way that the system become stable with the correct replica locations as mentioned in the above paragraph.
+
+At the fault recovery, the Master Server (M) will issue a notification to the Object Servers (S) asking to rearrange, so that the Object Servers (S) go through the list of objects which it 
+is responsible and apply the modulo function again according to the new Object server count. All the Object Servers (S) process this action simultaneously and object movement among servers 
+will rearrange the system. Once this is completed the Master Server (M) will issue another notification to the Object servers, so that they can invalidate the current replica object set they 
+are holding and replicate the new object set. After this replication step the system becomes stable and the Master Server (M) starts to issue TIDs again. Furthermore, if a new server is added to
+the system, exactly the same steps mentioned above will be followed by the system.
 
 %------------------------------------------------------------------------- 
 \SubSection{Coordinator/Master responsiblities}
 \label{subsec:respon}
 
-The Coordinator's responsabilities and interface are different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and processes, the Coordinator can be any of the Servers, thus reducing the Master's load. The list of servers available to the Client is supplied by the Master and it's updated with every Server group membership change.
+The Coordinator's responsabilities and interface are different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and processes, 
+the Coordinator can be any of the Servers, thus reducing the Master's load. The list of servers available to the Client is supplied by the Master and it's updated with every Server group membership change.
 
 The responsibilities below are shared for both scenarios:
 \begin{itemize}[noitemsep,nolistsep]
@@ -189,20 +219,26 @@ Figure \ref{fig:transa} illustrates the steps between the Client, Coordinator, M
 %-------------------------------------------------------------------------
 \SubSection{Timestamp Ordering and Deadlock Detection}
 \label{subsec:dldetect}
-Since timestamp ordering will be used for concurrency control the chances of deadlock occurring are limited.
-Each transaction is assigned a unique timestamp upon start. Each operation in a transaction is validated when it is carried out.
-Should a transaction fail the validation, it is aborted immediately, but can be restarted by the client. The client is issued with a globally unique transaction timestamp by the Coordinator. The servers are jointly responsible for ensuring serial equivalence i.e. if server S1 access an object before S2, then server S1 is before S2 at all objects. The coordinators must agree on timestamp ordering so as to achieve the same ordering at all the servers. The timestamp will consist of a {\it <local timestamp, server-id> } pair. Timestamps can be kept roughly synchronized by the use of synchronized local physical clocks coordinated by the master.
+Since timestamp ordering will be used for concurrency control the chances of deadlock appearing are eliminated.
+Each transaction is assigned a unique timestamp value when it starts. Each operation in a transaction is validated when it is carried out.
+If a transaction fails the validation, it is aborted immediately and can then be started by the client. 
 
-Conflict resolution will be performed at each operation.
+The client is issued with a globally unique transaction timestamp by the first coordinator accessed
+by a transaction. The servers are jointly responsible for ensuring serial equivalence i.e. if server S1 access an object before server S2, then server S1 is before S2 at all objects. The coordinators
+must agree on timestamp ordering so as to achieve the same ordering at all the servers. The timestamp will consist of a {\it <local timestamp, server-id> } pair. Timestamps can be kept roughly synchronized
+by the use of synchronized local physical clocks coordinated by the master.
+
 The basic timestamp ordering rule is based on operation conflicts and is very simple:
-{\it A transaction’s request to write an object is valid only if that object was last read and written by earlier transactions. A transaction’s request to read an object is valid only if that object was last written by an earlier transaction.} [Reference: Distributed Systems].
-If the resolution is to abort the transaction then the coordinator will be informed and it will abort the transaction at all the participants.
+{\it A transaction’s request to write an object is valid only if that object was last read and written by earlier transactions. A transaction’s request to read an object is valid only if that object was
+last written by an earlier transaction.}[1]. Each transaction has its own tentative version of each object it accesses, such that multiple concurrent transactions can access the same object. The tentative
+versions of each object are committed in the order determined by the timestamps of their transactions by transactions waiting, when necessary, for earlier transactions to complete their writes.
+Since transactions only wait for earlier ones (and no cycle could occur in the wait-for graph), no deadlocks occur.
+
+Conflict resolution will be performed at each operation. If the resolution is to abort the transaction then the coordinator will be informed and it will abort the transaction at all the participants.
 
 %--------------------------------------------------------------------------
-\SubSection{Fault Tolerant scenario}
+\SubSection{Fault Tolerant Algorithm}
 \label{subsec:faultol}
-In this phase we design to provide fault tolerance for single object server failure. This is an extension for the previous design. The idea is to keep an exact copy of the objects in adjacent server.
-For instance the object stored in Object server S1, should keep the exact copy in the S2 server as a replica. The master server is responsible for keeping track of the replica servers.
 
 When the object server {\bf fails},
 \begin{enumerate}[noitemsep, nolistsep]
@@ -224,21 +260,24 @@ When the failed server {\bf recovers},
 %------------------------------------------------------------------------- 
 \Section{Footnotes}
 
-Please use footnotes sparingly%
-\footnote
-   {%
-     Or, better still, try to avoid footnotes altogether.  To help your 
-     readers, avoid using footnotes altogether and include necessary 
-     peripheral observations in the text (within parentheses, if you 
-     prefer, as in this sentence).
-   }
-and place them at the bottom of the column on the page on which they are 
-referenced. Use Times 8-point type, single-spaced.
+%Please use footnotes sparingly%
+%\footnote
+%  {%
+%     Or, better still, try to avoid footnotes altogether.  To help your
+%     readers, avoid using footnotes altogether and include necessary
+%     peripheral observations in the text (within parentheses, if you
+%      prefer, as in this sentence).
+%   }
+%and place them at the bottom of the column on the page on which they are
+%referenced. Use Times 8-point type, single-spaced.
 
 
 %------------------------------------------------------------------------- 
 \SubSection{References}
-
+\label{subsec:ref}
+\begin{enumerate}
+\item George Coulouris, Jean Dollimore, Tim Kindberg, and Gordon Blair. {\it Distributed Systems: Concepts and Design.} Addison-Wesley Publishing Company, USA, 5th edition, 2011.
+\end{enumerate}
 %------------------------------------------------------------------------- 
 \SubSection{Conclusions}
 
