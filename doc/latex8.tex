@@ -48,10 +48,16 @@
 
 %------------------------------------------------------------------------- 
 \Section{Introduction}
-In the following sections the implementation of a distributed software 
-transactional memory library is presented for two scenarios:\\
-a) perfect Master, Servers and links\\
-b) perfect Master, links and recoverable, sequentially consistent Servers\\
+Due to the revolution in the computing world and marketing strategies, today’s world has moved to cloud based services rather than maintaining their own networks. The cloud service providers are well
+equipped with the hardware and software infrastructure to provide better services because of the aspect of Distributed computing. 
+
+In this model of computing one of the main problems that the providers has to face is the concurrent transactions. How the system behave when multiple users access the same object at the same 
+time and manipulates them. How to maintain the proper order of commit and how to resolve conflicting manipulations. Here in this paper we are going to address this problem deeper and propose 
+a solution which can be implemented and evaluated during next few weeks ahead.
+
+In the following sections the implementation of a distributed software transactional memory library is presented for two scenarios: \\
+a) perfect Master, Servers and links \\
+b) perfect Master, links and recoverable, sequentially \\
 
 Section \ref{sec:arch} introduces an overview of each scenario. Section 
 \ref{sec:algor} discusses the algorithms used for concurrency control, 
@@ -90,8 +96,39 @@ following entities:
 \end{figure}
 Note that the number of object servers can be varied.
 %------------------------------------------------------------------------- 
-\SubSection{Recoverable, replicated Servers with perfect Master}
-\label{subsec:recov}
+\SubSection{Phase One, Perfect System}
+\label{sec:phase1}
+According to figure 1, master server (M) being a centralized server in the system, helps the object servers (S) to bootstrap the system. When bootstrap, the master server will keep information such as
+IP address, port of the bootstrapping server and issue valid references so that master can keep track of them. Once Object Servers (S) have joined the system the Clients (C) can connect 
+and start transactions. Transaction Identifiers (TID) should be unique to the whole system therefore the Master server (M) will keep track of the global sequence of TIDs.
+
+Clients (C) are supposed to query the Master Server (M) if the local cache of the client is out dated or the Object Servers (S) in the cache do not respond. The Master Server (M) will 
+provide the latest list of Object Servers(S) so that clients can continue operation.
+
+Objects that are going to be stored in Object Servers (S) have unique identifiers (integer) so that each object can be uniquely identified throughout the system. Therefore in this solution
+we are using the modulo function against the number of Object Servers (S) available in order to find the actual location of the object to be stored or referred.
+
+The clients (C) can connect multiple Object Servers inside a single transaction, hence it is required to have a coordinator in order to manage the transaction operations such as commit and abort.
+Therefore we consider the Master Server (M) as the coordinator. Once a Client (C) needs to manipulate an object it should ask the relevant object server to contact the coordinator (M) and join 
+for the transaction. Then the manipulation operations (Read/Write) can be done by only contacting the Object Servers (S).
+
+%------------------------------------------------------------------------- 
+\SubSection{Phase two, fault tolerant system}
+\label{subsec:phase2}
+This is an extension to the above proposed system, therefore in order to recover from failures, it is required to have an exact replication of the objects in a certain Object Server (S) in 
+another Object Server (S). The Master Server (S) has to take care of the replica location of each server. Here we propose the replica location as a ring, where replica of S1 contains in S2, 
+and replica of S2 contains in S3, etc. Furthermore each Object Server (S) is notified with its replica, by the Master Server (M). The transaction modal is similar to the phase one, the
+only extension required is to ask the replica server as well to join the coordinator for the transaction.
+
+In case of a failure, the Master Server (M) will identify it by the drop of heart beat messages from the server and Master Server would issue a notification to all the Object servers (S) 
+regarding the failure and it will block the issuing of TIDs for the clients until the failure recovered. Once the current transactions is completed, the master will rearrange the system in
+such a way that the system become stable with the correct replica locations as mentioned in the above paragraph.
+
+At the fault recovery, the Master Server (M) will issue a notification to the Object Servers (S) asking to rearrange, so that the Object Servers (S) go through the list of objects which it 
+is responsible and apply the modulo function again according to the new Object server count. All the Object Servers (S) process this action simultaneously and object movement among servers 
+will rearrange the system. Once this is completed the Master Server (M) will issue another notification to the Object servers, so that they can invalidate the current replica object set they 
+are holding and replicate the new object set. After this replication step the system becomes stable and the Master Server (M) starts to issue TIDs again. Furthermore, if a new server is added to
+the system, exactly the same steps mentioned above will be followed by the system.
 
 %------------------------------------------------------------------------- 
 \SubSection{Coordinator/Master responsiblities}
@@ -160,7 +197,7 @@ The advantages of choosing {\it Timestamp Ordering} over {\it Two-Phase Locking}
 \begin{itemize}[noitemsep, nolistsep]
 \item Deadlock prevention - common with the use of locks
 \item Better performance for transactions with predominantly {\it read} operations \cite{bernstein1987concurrency}
-\item Faster conflict resolution when compared to locking - transactions are aborted immediately.\\
+\item Faster conflict resolution when compared to locking - transactions are aborted immediately.
 \end{itemize}
 
 Figure \ref{fig:transa} illustrates the steps between the Client, Coordinator, Master and Object Serves during a transaction. The steps below further details the communication that occurs between processes in a perfect setup: 
@@ -195,11 +232,15 @@ Should a transaction fail the validation, it is aborted immediately, but can be 
 
 Conflict resolution will be performed at each operation.
 The basic timestamp ordering rule is based on operation conflicts and is very simple:
-{\it A transaction’s request to write an object is valid only if that object was last read and written by earlier transactions. A transaction’s request to read an object is valid only if that object was last written by an earlier transaction.} \cite[p.~215]{coulouris2005distributed}
-If the resolution is to abort the transaction then the Coordinator will be informed and it will abort the transaction at all the participants.
+{\it A transaction’s request to write an object is valid only if that object was last read and written by earlier transactions. A transaction’s request to read an object is valid only if that object was
+last written by an earlier transaction.}[1]. Each transaction has its own tentative version of each object it accesses, such that multiple concurrent transactions can access the same object. The tentative
+versions of each object are committed in the order determined by the timestamps of their transactions by transactions waiting, when necessary, for earlier transactions to complete their writes.
+Since transactions only wait for earlier ones (and no cycle could occur in the wait-for graph), no deadlocks occur.
+
+Conflict resolution will be performed at each operation. If the resolution is to abort the transaction then the coordinator will be informed and it will abort the transaction at all the participants.
 
 %--------------------------------------------------------------------------
-\SubSection{Fault Tolerant environment}
+\SubSection{Fault Tolerant scenario}
 \label{subsec:faultol}
 In this phase we design to provide fault tolerance for single object server failure. This is an extension for the previous design. The idea is to keep an exact copy of the objects in adjacent server.
 For instance the object stored in Object server S1, should keep the exact copy in the S2 server as a replica. The master server is responsible for keeping track of the replica servers.
@@ -224,16 +265,16 @@ When the failed server {\bf recovers},
 %------------------------------------------------------------------------- 
 \Section{Footnotes}
 
-Please use footnotes sparingly%
-\footnote
-   {%
-     Or, better still, try to avoid footnotes altogether.  To help your 
-     readers, avoid using footnotes altogether and include necessary 
-     peripheral observations in the text (within parentheses, if you 
-     prefer, as in this sentence).
-   }
-and place them at the bottom of the column on the page on which they are 
-referenced. Use Times 8-point type, single-spaced.
+%Please use footnotes sparingly%
+%\footnote
+%  {%
+%     Or, better still, try to avoid footnotes altogether.  To help your
+%     readers, avoid using footnotes altogether and include necessary
+%     peripheral observations in the text (within parentheses, if you
+%      prefer, as in this sentence).
+%   }
+%and place them at the bottom of the column on the page on which they are
+%referenced. Use Times 8-point type, single-spaced.
 
 
 %------------------------------------------------------------------------- 
