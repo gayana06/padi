@@ -12,6 +12,7 @@
 \usepackage{times}
 \usepackage{graphicx}
 \usepackage{epstopdf}
+\usepackage{enumitem}
 
 %\documentstyle[times,art10,twocolumn,latex8]{article}
 
@@ -60,14 +61,21 @@ transaction management and Client-Server communication
 \Section{Architecture}
 \label{sec:arch}
 
-%TODO: Include diagram for both scenarios in different subsections.
+The assumption made for all the sections below is that the Master is a perfect process. The names Object Servers and Servers are used interchangeably across the sections below and refer to the any non-Master process participant in a transaction.
+
+Main differences between the two architectures, perfect and fault-tolerant, are the following:
+\begin{itemize}[noitemsep,nolistsep]
+\item for perfect, the Coordinator can be any server, not necessarily the Master
+\item 
+\end{itemize}
+%TODO: Add more differences between the two archs.
 
 %------------------------------------------------------------------------- 
 \SubSection{Perfect links and processes}
 \label{subsec:perf}
 As illustrated in Figure \ref{fig:perf}, the architecture consists of the 
 following perfect entities: 
-\begin{itemize}
+\begin{itemize}[noitemsep,nolistsep]
 \item {\bf M} - Master server 
 \item {\bf S} - Object server
 \item {\bf C} - Client      
@@ -88,28 +96,27 @@ Note that the number of object servers can be varied.
 \SubSection{Coordinator/Master responsiblities}
 \label{subsec:respon}
 
-The Coordinator's responsabilities and interface is different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and non-Byzantine processes, the Coordinator can be any of the Servers, thus balancing the load among the servers. The list of servers the Client chooses from is supplied by the Master to the Client and changes every time the group membership changes (i.e. Servers leave or join). 
+The Coordinator's responsabilities and interface is different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and processes, the Coordinator can be any of the Servers, thus reducing the Master's load. The list of servers the Client chooses from is supplied by the Master to the Client and it's updated with every Server group membership change.
 
 %------------------------------------------------------------------------- 
 \Section{Algorithms}
 \label{sec:algor}
+In the subsections below, the steps for the most important parts of the system are enlisted.
 
 %------------------------------------------------------------------------ 
 \SubSection{Communication}
-The following communication occurs {\bf before} the client attempts connection 
-to the Master node.
+The following communication occurs {\bf before} the client attempts connection to the Master node - it is the communication exchanged between the Master and the Servers.
 \begin{enumerate}
-\item Master starts first followed by the Object Servers bootstrap
+\item Master boots first followed by the Object Servers bootstrap
 \item During Object Servers bootstrap:
 \begin{enumerate}
 \item Master identifies the Object Servers trying to connect
-\item Master assigns a unique name to the Object Servers for later use as a reference
+\item Master assigns a unique name to the Object Servers to be later used as a reference
 \end{enumerate}
 \item Object Servers's heartbeat messages periodically sent to Master. This is useful for replica management i.e. If one of the replicas fail then the objects can be replicated in another replica to always maintain a certain level of availability in the system.
 \end{enumerate}
 
 Upon {\bf attempting a transaction} (object storage) the following communication exists between the Client and Master and Object Servers: 
-
 \begin{enumerate}
 \item Client connects to the Master and requests a transaction identifier 
 \item Master maintains a global transaction sequence and returns a unique transaction identifier (TID) to the Client. Furthermore, a list of healthy Object Servers is also returned to the Client. 
@@ -139,7 +146,7 @@ The {\it Flat Transaction} model allows for a client to manipulate objects on mu
 
 
 The advantages of choosing {\it Timestamp Ordering} over {\it Two-Phase Locking} or {\it Optimistic Concurrency} options are the following: 
-\begin{itemize}
+\begin{itemize}[noitemsep,nolistsep]
 \item Deadlock prevention - common with the use of locks
 \item Better performance for transactions with predominantly {\it read} operations \cite{bernstein1987concurrency}
 \item Faster conflict resolution when compared to locking - transactions are aborted immediately.
@@ -161,21 +168,17 @@ The following steps are made when performing a transaction in the {\bf perfect} 
 %-------------------------------------------------------------------------
 \SubSection{Timestamp Ordering and Deadlock Detection}
 \label{subsec:dldetect}
-Since timestamp ordering will be used for concurrency control the chances of deadlock appearing are eliminated.
-Each transaction is assigned a unique timestamp value when it starts. Each operation in a transaction is validated when it is carried out.
-If a transaction fails the validation, it is aborted immediately and can then be started by the client. The client is issued with a globally unique transaction timestamp by the first coordinator accessed
-by a transaction. The servers are jointly responsible for ensuring serial equivalence i.e. if server S1 access an object before server S2, then server S1 is before S2 at all objects. The coordinators
-must agree on timestamp ordering so as to achieve the same ordering at all the servers. The timestamp will consist of a {\it <local timestamp, server-id> } pair. Timestamps can be kept roughly synchronized
-by the use of synchronized local physical clocks coordinated by the master.
+Since timestamp ordering will be used for concurrency control the chances of deadlock occurring are limited.
+Each transaction is assigned a unique timestamp upon start. Each operation in a transaction is validated when it is carried out.
+Should a transaction fail the validation, it is aborted immediately, but can be restarted by the client. The client is issued with a globally unique transaction timestamp by the Coordinator. The servers are jointly responsible for ensuring serial equivalence i.e. if server S1 access an object before server S2, then server S1 is before S2 at all objects. The coordinators must agree on timestamp ordering so as to achieve the same ordering at all the servers. The timestamp will consist of a {\it <local timestamp, server-id> } pair. Timestamps can be kept roughly synchronized by the use of synchronized local physical clocks coordinated by the master.
 
 Conflict resolution will be performed at each operation.
 The basic timestamp ordering rule is based on operation conflicts and is very simple:
-{\it A transaction’s request to write an object is valid only if that object was last read and written by earlier transactions. A transaction’s request to read an object is valid only if that object was
-last written by an earlier transaction.} [Reference: Distributed Systems].
+{\it A transaction’s request to write an object is valid only if that object was last read and written by earlier transactions. A transaction’s request to read an object is valid only if that object was last written by an earlier transaction.} [Reference: Distributed Systems].
 If the resolution is to abort the transaction then the coordinator will be informed and it will abort the transaction at all the participants.
 
 %--------------------------------------------------------------------------
-\SubSection{Fault Tolerance}
+\SubSection{Fault Tolerant environment}
 \label{subsec:faultol}
 In this phase we design to provide fault tolerance for single object server failure. This is an extension for the previous design. The idea is to keep an exact copy of the objects in adjacent server.
 For instance the object stored in Object server S1, should keep the exact copy in the S2 server as a replica. The master server is responsible for keeping track of the replica servers.
