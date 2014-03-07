@@ -69,24 +69,16 @@ transaction management and Client-Server communication
 \label{sec:arch}
 
 The assumption made for all the sections below is that the Master is a perfect process. The names Object Servers and Servers are used interchangeably across the sections below and refer to the any non-Master process participant in a transaction.
-
 Main differences between the two architectures, perfect and fault-tolerant, are the following:
 \begin{itemize}[noitemsep,nolistsep]
-\item for perfect, the Coordinator can be any server, not necessarily the Master
+\item for perfect, the Coordinator of a transaction can be any Server, not necessarily the Master
 \item 
 \end{itemize}
-%TODO: Add more differences between the two archs.
-
 %------------------------------------------------------------------------- 
 \SubSection{Perfect links and processes}
 \label{subsec:perf}
-As illustrated in Figure \ref{fig:perf}, the architecture consists of the 
-following entities: 
-\begin{itemize}[noitemsep,nolistsep]
-\item {\bf M} - Master server 
-\item {\bf S} - Object server
-\item {\bf C} - Client      
-\end{itemize}
+As illustrated in Figure \ref{fig:perf}, the Master server (M) is used by the Object Servers (S) when bootstrapping. Information such as
+IP address,  the port of the Server is collected by the Master which, then, issues unique identifiers for each Server. Once the Object Server (S) has been issued an identifier and notified the Master of joining the group of available servers, they can be connected by Clients (C) for handling transactions. Transaction identifiers (TID) should be unique to the whole system therefore the Master server (M) will keep track of the global sequence of TIDs.
 
 \begin{figure}
 \centering
@@ -94,41 +86,23 @@ following entities:
 \caption{Master/Server entities in a perfect setup}
 \label{fig:perf}
 \end{figure}
-Note that the number of object servers can be varied.
-%------------------------------------------------------------------------- 
-\SubSection{Phase One, Perfect System}
-\label{sec:phase1}
-According to figure 1, master server (M) being a centralized server in the system, helps the object servers (S) to bootstrap the system. When bootstrap, the master server will keep information such as
-IP address, port of the bootstrapping server and issue valid references so that master can keep track of them. Once Object Servers (S) have joined the system the Clients (C) can connect 
-and start transactions. Transaction Identifiers (TID) should be unique to the whole system therefore the Master server (M) will keep track of the global sequence of TIDs.
+Note: the number of Object Servers can vary.
 
-Clients (C) are supposed to query the Master Server (M) if the local cache of the client is out dated or the Object Servers (S) in the cache do not respond. The Master Server (M) will 
-provide the latest list of Object Servers(S) so that clients can continue operation.
+Clients (C) will query the Master (M) if the their cache is outdated or trying to reach the Object Servers (S) times out. The Master (M) provides the Client the updated list of available Object Servers (S) to be used for establishing transactions.
 
-Objects that are going to be stored in Object Servers (S) have unique identifiers (integer) so that each object can be uniquely identified throughout the system. Therefore in this solution
-we are using the modulo function against the number of Object Servers (S) available in order to find the actual location of the object to be stored or referred.
+Objects that are going to be stored in Object Servers (S) have unique identifiers (integer) so that each object can be uniquely identified throughout the system. Therefore in this solution we are using the modulo function against the number of Object Servers (S) available in order to find the actual location of the object to be stored or referred.
 
-The clients (C) can connect multiple Object Servers inside a single transaction, hence it is required to have a coordinator in order to manage the transaction operations such as commit and abort.
-Therefore we consider the Master Server (M) as the coordinator. Once a Client (C) needs to manipulate an object it should ask the relevant object server to contact the coordinator (M) and join 
-for the transaction. Then the manipulation operations (Read/Write) can be done by only contacting the Object Servers (S).
+The clients (C) can connect to multiple Object Servers inside a single transaction, hence it is required to have a Coordinator that manages the transaction operations such as commit and abort.
+The Coordinator can be any Server from the list provided by the Master in the current, perfect, scenario. On the other hand, in the fault-tolerant scenario, we consider the Master (M) as the coordinator. When a Client (C) needs to manipulate an object it connect to the relevant Object Server, which will contact the Coordinator (M) and join the transaction. Then the manipulation operations (Read/Write) are handled only by the Client and the Object Servers (S).
 
 %------------------------------------------------------------------------- 
-\SubSection{Phase two, fault tolerant system}
-\label{subsec:phase2}
-This is an extension to the above proposed system, therefore in order to recover from failures, it is required to have an exact replication of the objects in a certain Object Server (S) in 
-another Object Server (S). The Master Server (S) has to take care of the replica location of each server. Here we propose the replica location as a ring, where replica of S1 contains in S2, 
-and replica of S2 contains in S3, etc. Furthermore each Object Server (S) is notified with its replica, by the Master Server (M). The transaction modal is similar to the phase one, the
-only extension required is to ask the replica server as well to join the coordinator for the transaction.
+\SubSection{Fault Tolerant system}
+\label{subsec:ftsys}
+For recoverability in case of failure, an extension to the above system is necessary. Having a replication of the transaction's objects in a particular Object Server (S) across other Servers (S) is necessary to assure recoverability. The Master (S) handles the replica location of each Server. Our proposal for the replica locations is a conceptual ring, where S1's replica is stored in S2, and that of S2 in S3, etc. The Master notifies each Ssever of its replica location. The transaction modal is similar to the phase one, the only extension required is to ask the replica server as well to join the coordinator for the transaction.
 
-In case of a failure, the Master Server (M) will identify it by the drop of heart beat messages from the server and Master Server would issue a notification to all the Object servers (S) 
-regarding the failure and it will block the issuing of TIDs for the clients until the failure recovered. Once the current transactions is completed, the master will rearrange the system in
-such a way that the system become stable with the correct replica locations as mentioned in the above paragraph.
+The Master server (M) also assumes the role of a {\it failure detector}, by using the heartbeat messages regularly exchanged between the Master and the Server. In case of an Object Server(S) failure, the Master server(M) will identify it through heartbeats and issue a notification to all the other Object Servers (S) about the failure. No further TIDs are issued for the clients until the failure recovered. Once the current transactions complete, the Master will stabilise the system with the correct replica locations.
 
-At the fault recovery, the Master Server (M) will issue a notification to the Object Servers (S) asking to rearrange, so that the Object Servers (S) go through the list of objects which it 
-is responsible and apply the modulo function again according to the new Object server count. All the Object Servers (S) process this action simultaneously and object movement among servers 
-will rearrange the system. Once this is completed the Master Server (M) will issue another notification to the Object servers, so that they can invalidate the current replica object set they 
-are holding and replicate the new object set. After this replication step the system becomes stable and the Master Server (M) starts to issue TIDs again. Furthermore, if a new server is added to
-the system, exactly the same steps mentioned above will be followed by the system.
+At the fault recovery, the Master server (M) will issue a notification to the Object Servers (S) asking to rearrange, so that the Object Servers (S) go through the list of objects which it is responsible and apply the modulo function again according to the new Object server count. All the Object Servers (S) process this action simultaneously and the object movement among servers will stabilize the system. Once the system is stable, the Master (M) will issue another notification to the Object Servers to invalidate the current replica object set and replicate the new object set. After this replication step the system becomes stable and the Master Server (M) starts to issue TIDs again. Furthermore, if a new server is added to the system, exactly the same steps mentioned above will be followed by the system.
 
 %------------------------------------------------------------------------- 
 \SubSection{Coordinator/Master responsiblities}
@@ -138,9 +112,9 @@ The Coordinator's responsabilities and interface are different for the two scena
 
 The responsibilities below are shared for both scenarios:
 \begin{itemize}[noitemsep,nolistsep]
-\item {\bf M} - Master server 
-\item {\bf S} - Object server
-\item {\bf C} - Client      
+\item assign a transaction identifier to the Client 
+\item handle abort and commit commands from the Client or Object Servers 
+\item interface with the participant servers in the transaction during the voting and commit phases 
 \end{itemize}
 
 %------------------------------------------------------------------------- 
@@ -200,7 +174,7 @@ The advantages of choosing {\it Timestamp Ordering} over {\it Two-Phase Locking}
 \item Faster conflict resolution when compared to locking - transactions are aborted immediately.
 \end{itemize}
 
-Figure \ref{fig:transa} illustrates the steps between the Client, Coordinator, Master and Object Serves during a transaction. The steps below further details the communication that occurs between processes in a perfect setup: 
+Figure \ref{fig:transa} illustrates the steps between the Client, Coordinator, Master and Object Serves during a transaction. The steps below offer more details on the communication that occurs in a perfect setup: 
 
 \begin{itemize}[noitemsep, nolistsep]
 \item {\bf Steps 3-4:} Client acquires transaction ID from the Coordinator 
@@ -245,25 +219,25 @@ Conflict resolution will be performed at each operation. If the resolution is to
 In this phase we design to provide fault tolerance for single object server failure. This is an extension for the previous design. The idea is to keep an exact copy of the objects in adjacent server.
 For instance the object stored in Object server S1, should keep the exact copy in the S2 server as a replica. The master server is responsible for keeping track of the replica servers.
 
-When the object server {\bf fails},
+When an Object Server {\bf fails}:
 \begin{enumerate}[noitemsep, nolistsep]
-\item Master detects the server failure from the absence of the heartbeat message from the object server.
-\item Master server issues a {\it “failure warning notification”} for the servers, so that the current transactions related to the absent server will be aborted.
-Others will continue but new transactions will not be proceeded. (Master block providing TIDs)
-\item Master server coordinates object replication so that the currently available servers share the objects held by the absent server.
-\item Once the master notifies all the servers about the stabilized status, transactions can be continued again.
+\item Master detects the failure from the absence of heartbeat message from the server
+\item Master server issues a {\it “failure warning notification”} to the other servers, so that the current transactions related to the absent server be aborted.
+Others will continue but new transactions will not be proceeded. (Master no longer issuing TIDs)
+\item Master coordinates the object replication so that the currently available servers share the objects held by the absent server.
+\item Once the Master notifies all the servers about the new, stable status, transactions can be take place again.
 \end{enumerate}
 
 When the failed server {\bf recovers},
 \begin{enumerate}[noitemsep, nolistsep]
 \item Master detects the arrival of a new server.
-\item Master server issues a {\it “New server notification”} for the servers. Once the current pending transactions are completed, stabilizing the servers occur.
+\item Master server issues a {\it “New server notification”} for the servers. Once the current pending transactions are completed, stabilizing the servers occurs.
 \item Master server coordinates object replication so that the currently available servers share the objects held by the absent server.
-\item Once the master notifies all the servers the stabilized status, transactions can be continued again.
+\item Once the Master notifies all the servers the stabilized status, transactions can be continued again.
 \end{enumerate}
 
 %------------------------------------------------------------------------- 
-\Section{Footnotes}
+\Section{Conclusion}
 
 %Please use footnotes sparingly%
 %\footnote
@@ -278,14 +252,11 @@ When the failed server {\bf recovers},
 
 
 %------------------------------------------------------------------------- 
-\SubSection{References}
+\Section{References}
 
-%------------------------------------------------------------------------- 
-\SubSection{Conclusions}
-
-%------------------------------------------------------------------------- 
 \bibliographystyle{latex8}
 \bibliography{latex8}
 
+%------------------------------------------------------------------------- 
 \end{document}
 
