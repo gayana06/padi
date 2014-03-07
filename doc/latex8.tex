@@ -98,7 +98,7 @@ The Coordinator can be any Server from the list provided by the Master in the cu
 %------------------------------------------------------------------------- 
 \SubSection{Fault Tolerant system}
 \label{subsec:ftsys}
-For recoverability in case of failure, an extension to the above system is necessary. Having a replication of the transaction's objects in a particular Object Server (S) across other Servers (S) is necessary to assure recoverability. The Master (S) handles the replica location of each Server. Our proposal for the replica locations is a conceptual ring, where S1's replica is stored in S2, and that of S2 in S3, etc. The Master notifies each Ssever of its replica location. The transaction modal is similar to the phase one, the only extension required is to ask the replica server as well to join the coordinator for the transaction.
+For recoverability in case of failure, an extension to the above system is necessary. Having a replication of the transaction's objects in a particular Object Server (S) across other Servers (S) is necessary to assure recoverability. The Master (M) handles the replica location of each Server. Our proposal for the replica locations is a conceptual ring, where S1's replica is stored in S2, and that of S2 in S3, etc. The Master notifies each Server of its replica location. The transaction modal is similar to the phase one, the only extension required is to ask the replica server as well to join the coordinator for the transaction.
 
 The Master server (M) also assumes the role of a {\it failure detector}, by using the heartbeat messages regularly exchanged between the Master and the Server. In case of an Object Server(S) failure, the Master server(M) will identify it through heartbeats and issue a notification to all the other Object Servers (S) about the failure. No further TIDs are issued for the clients until the failure recovered. Once the current transactions complete, the Master will stabilise the system with the correct replica locations.
 
@@ -232,7 +232,7 @@ When the failed server {\bf recovers},
 \begin{enumerate}[noitemsep, nolistsep]
 \item Master detects the arrival of a new server.
 \item Master server issues a {\it “New server notification”} for the servers. Once the current pending transactions are completed, stabilizing the servers occurs.
-\item Master server coordinates object replication so that the currently available servers share the objects held by the absent server.
+\item Master server coordinates object replication so that a portion of objects in the current system will be transferred to the new server.
 \item Once the Master notifies all the servers the stabilized status, transactions can be continued again.
 \end{enumerate}
 
