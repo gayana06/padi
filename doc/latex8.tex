@@ -31,17 +31,11 @@
 
 \begin{abstract}
 
-
    The present paper describes the details of a distributed software
    transactional memory implementation.
-   There are 2 scenarios presented for a Master/Server architecture: \\
-   a) perfect links and processes (Master and Servers) \\
-   b) perfect links and Master, but recoverable Servers \\
-
-   Transaction management, concurrency control, failure detector and 
-   replication mechanisms are described for both perfect and fault-tolerant
-   architectures.
-   
+   Solutions for 2 scenarios are presented: \\
+   a) perfect links and processes \\
+   b) fault-tolerant environment with replication \\
 \end{abstract}
 
 
@@ -68,27 +62,32 @@ transaction management and Client-Server communication
 \Section{Architecture}
 \label{sec:arch}
 
-The assumption made for all the sections below is that the Master is a perfect process. The names Object Servers and Servers are used interchangeably across the sections below and refer to the any non-Master process participant in a transaction.
-Main differences between the two architectures, perfect and fault-tolerant, are the following:
+The assumption made for all the sections below is that the Master is a perfect process. The names Object Servers and Servers are used interchangeably and refer to any non-Master and non-Client process that participates in a transaction.
+The main differences/similarities between the two architectures, perfect and fault-tolerant, are the following:
 \begin{itemize}[noitemsep,nolistsep]
 \item for perfect, the Coordinator of a transaction can be any Server, not necessarily the Master
-\item 
+\item in the fault-tolerant scenario, replication of tentative objects and transactions is assured
+\item the Master also acts as a failure detector in both scenarios 
+\item the Master and the Coordinator are the same process in the fault-tolerant scenario
 \end{itemize}
+
+Subsection \ref{subsec:perf} details the perfect architecture, while Subsection \ref{subsec:ftsys} lists the details of the fault-tolerant architecture. Further details on the reponsibilities of the Coordinator/Master are in Subsection \ref{subsec:respon}.
 %------------------------------------------------------------------------- 
 \SubSection{Perfect links and processes}
 \label{subsec:perf}
-As illustrated in Figure \ref{fig:perf}, the Master server (M) is used by the Object Servers (S) when bootstrapping. Information such as
-IP address,  the port of the Server is collected by the Master which, then, issues unique identifiers for each Server. Once the Object Server (S) has been issued an identifier and notified the Master of joining the group of available servers, they can be connected by Clients (C) for handling transactions. Transaction identifiers (TID) should be unique to the whole system therefore the Master server (M) will keep track of the global sequence of TIDs.
+As illustrated in Figure \ref{fig:perf}, the Master server {\it(M)} is used by the Object Servers {\it(S)} when bootstrapping. Information such as
+IP address and port number of the Server is stored by the Master which, then, issues unique identifiers for each Server. Once the Object Server (S) has been issued an identifier and notified the Master of joining the group of available servers, it can be connected by Clients {\it(C)} for handling transactions. Transaction identifiers (TID) should be unique to the whole system therefore the Master server (M) will keep track of the global sequence of TIDs.
 
 \begin{figure}
 \centering
 \includegraphics[scale=0.3]{perfect.eps}
-\caption{Master/Server entities in a perfect setup}
+\caption{Master, Server and Client entities in a perfect setup}
 \label{fig:perf}
 \end{figure}
+
 Note: the number of Object Servers can vary.
 
-Clients (C) will query the Master (M) if the their cache is outdated or trying to reach the Object Servers (S) times out. The Master (M) provides the Client the updated list of available Object Servers (S) to be used for establishing transactions.
+Clients (C) will query the Master (M) if the their cached list of servers is outdated or attempting to reach an Object Server (S) times out. The Master (M) provides the Client an updated list of the available Object Servers (S) to be used for establishing/handling transactions.
 
 Objects that are going to be stored in Object Servers (S) have unique identifiers (integer) so that each object can be uniquely identified throughout the system. Therefore in this solution we are using the modulo function against the number of Object Servers (S) available in order to find the actual location of the object to be stored or referred.
 
@@ -108,15 +107,16 @@ At the fault recovery, the Master server (M) will issue a notification to the Ob
 \SubSection{Coordinator/Master responsiblities}
 \label{subsec:respon}
 
-The Coordinator's responsabilities and interface are different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and processes, the Coordinator can be any of the Servers, thus reducing the Master's load. The list of servers available to the Client is supplied by the Master and it's updated with every Server group membership change.
+The Coordinator's responsabilities and interface are different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and processes, the Coordinator can be any of the Servers, thus reducing the Master's load. The list of servers available to the Client is supplied by the Master and it's updated with every server group membership change.
 
-The responsibilities below are shared for both scenarios:
+The Coordinator's responsibilities below are shared in both scenarios:
 \begin{itemize}[noitemsep,nolistsep]
 \item assign a transaction identifier to the Client 
 \item handle abort and commit commands from the Client or Object Servers 
 \item interface with the participant servers in the transaction during the voting and commit phases 
 \end{itemize}
 
+The Master also assumes the role of a failure detectore through the use of heartbeat messages. In the fault-tolerant environment, the Master also assumes the Coordinator role.
 %------------------------------------------------------------------------- 
 \Section{Algorithms}
 \label{sec:algor}
@@ -191,7 +191,7 @@ Figure \ref{fig:transa} illustrates the steps between the Client, Coordinator, M
 \begin{figure}
 \centering
 \includegraphics[scale=0.2]{transaction.eps}
-\caption{Transaction steps between the Client, Master, Coordinator and Servers}
+\caption{Transaction steps between the Client, Master, Coordinator and Servers. The dotted lines represent the 2-phase distributed commit}
 \label{fig:transa}
 \end{figure}
 
@@ -200,47 +200,52 @@ Figure \ref{fig:transa} illustrates the steps between the Client, Coordinator, M
 %-------------------------------------------------------------------------
 \SubSection{Timestamp Ordering and Deadlock Detection}
 \label{subsec:dldetect}
-Since timestamp ordering will be used for concurrency control the chances of deadlock occurring are limited.
-Each transaction is assigned a unique timestamp upon start. Each operation in a transaction is validated when it is carried out.
-Should a transaction fail the validation, it is aborted immediately, but can be restarted by the client. The client is issued with a globally unique transaction timestamp by the Coordinator. The servers are jointly responsible for ensuring serial equivalence i.e. if server S1 access an object before S2, then server S1 is before S2 at all objects. The coordinators must agree on timestamp ordering so as to achieve the same ordering at all the servers. The timestamp will consist of a {\it (local timestamp, server-id) } pair. Timestamps can be kept roughly synchronized by the use of synchronized local physical clocks coordinated by the master.
+Due to the use of timestamp ordering for concurrency control, there is limited probability of deadlock occurance.
+Each transaction is assigned a unique timestamp on start. Each operation in a transaction is validated when it is carried out.
+Should a transaction fail the validation it is immediately aborted, but can be restarted by the Client. The Client is issued with a globally unique transaction timestamp by the Coordinator. The servers are jointly responsible for ensuring serial equivalence. For instance, server S1 access an object before S2, thus server S1 appears before S2 for all objects. The Coordinators must agree on timestamp ordering to maintain all servers synchronised with the same ordering. The timestamp consists of a {\it (local timestamp, server-id)} pair and is kept synchronized by the use of local physical clocks coordinated by the Master.
 
-Conflict resolution will be performed at each operation.
+Conflict resolution is performed at each operation.
 The basic timestamp ordering rule is based on operation conflicts and is very simple:
 {\it A transaction’s request to write an object is valid only if that object was last read and written by earlier transactions. A transaction’s request to read an object is valid only if that object was
-last written by an earlier transaction.}[1]. Each transaction has its own tentative version of each object it accesses, such that multiple concurrent transactions can access the same object. The tentative
-versions of each object are committed in the order determined by the timestamps of their transactions by transactions waiting, when necessary, for earlier transactions to complete their writes.
-Since transactions only wait for earlier ones (and no cycle could occur in the wait-for graph), no deadlocks occur.
+last written by an earlier transaction.}\cite{coulouris2005distributed}. Each transaction has its own tentative version of each object it accesses, such that multiple concurrent transactions can access the same object. The tentative versions of each object are committed in the order determined by the timestamps of their transactions by transactions waiting, if necessary, for earlier transactions to complete their writes.
+Since transactions only wait for earlier ones (thus, no cycle occurs in the wait-for graph), no deadlocks occur.
 
-Conflict resolution will be performed at each operation. If the resolution is to abort the transaction then the coordinator will be informed and it will abort the transaction at all the participants.
+Conflict resolution is performed at each operation. If the resolution is to abort the transaction the Coordinator is informed and it will abort the transaction for all the participants.
 
 %--------------------------------------------------------------------------
-\SubSection{Fault Tolerant scenario}
+\SubSection{Replication}
 \label{subsec:faultol}
-In this phase we design to provide fault tolerance for single object server failure. This is an extension for the previous design. The idea is to keep an exact copy of the objects in adjacent server.
-For instance the object stored in Object server S1, should keep the exact copy in the S2 server as a replica. The master server is responsible for keeping track of the replica servers.
+The fault tolerant design supports failure of a single Object Server. It extends the perfect architecture by assuring the replication of objects in the adjacent server.
+For instance, the object stored in Object Server S1 keeps a copy in S2 as a replica. The Master server is responsible for keeping track of the replica servers.
 
 When an Object Server {\bf fails}:
 \begin{enumerate}[noitemsep, nolistsep]
-\item Master detects the failure from the absence of heartbeat message from the server
+\item Master detects the failure from the absence of heartbeat messages from the server
 \item Master server issues a {\it “failure warning notification”} to the other servers, so that the current transactions related to the absent server be aborted.
-Others will continue but new transactions will not be proceeded. (Master no longer issuing TIDs)
+Others will continue but new transactions will not be accepted. (Master no longer issuing TIDs)
 \item Master coordinates the object replication so that the currently available servers share the objects held by the absent server.
-\item Once the Master notifies all the servers about the new, stable status, transactions can be take place again.
+\item Once the Master notifies all the servers about the new, stable status, transactions can be take place again.\\
 \end{enumerate}
 
-When the failed server {\bf recovers},
+When the failed server {\bf recovers}:
 \begin{enumerate}[noitemsep, nolistsep]
-\item Master detects the arrival of a new server.
-\item Master server issues a {\it “New server notification”} for the servers. Once the current pending transactions are completed, stabilizing the servers occurs.
-\item Master server coordinates object replication so that a portion of objects in the current system will be transferred to the new server.
-\item Once the Master notifies all the servers the stabilized status, transactions can be continued again.
+\item Master detects the arrival of a new server
+\item Master server issues a {\it “New server notification”} for the servers. Once the current pending transactions are completed, servers are stabilized
+\item Master server coordinates object replication such that a portion of objects in the current system will be transferred to the new server
+\item Once the Master notifies all servers of the stabilized status, transactions can be resumed
 \end{enumerate}
 
 %------------------------------------------------------------------------- 
 \Section{Conclusion}
+Across the sections we discussed the solutions proposed in order to implement Distributed Software Transactional Memory System.
+Our solution addresses two scenarios: perfect links and processes and a fault tolerant system.
+A very important goal has been to provide a simple solution which would eliminate conflicts in transactions without encountering the inefficiency of a distributed environment. 
+The sections and subsections address each of the two architectures individually in order to provided a clearer distinction of responsibilities and complexity of the system.
+Furthermore,{\it Timestamp Ordering} based concurrency control aids in eliminating local and global deadlocks which represents one of the major issues that need to be addressed in DSTMs.
 
+Finally, we believe that the concepts we came across in the discussion of this paper builds a firm foundation for implementing this solution in an efficient manner.
 %------------------------------------------------------------------------- 
-\Section{References}
+%- \Section{References}
 
 \bibliographystyle{latex8}
 \bibliography{latex8}
