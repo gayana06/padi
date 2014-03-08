@@ -14,6 +14,7 @@
 \usepackage{epstopdf}
 \usepackage{enumitem}
 \usepackage[font=small]{caption}
+\usepackage[utf8]{inputenc}
 
 %\documentstyle[times,art10,twocolumn,latex8]{article}
 
@@ -39,12 +40,9 @@
 
 %------------------------------------------------------------------------- 
 \Section{Introduction}
-Due to the revolution in the computing world and marketing strategies, today’s world has moved to cloud based services rather than maintaining their own networks. The cloud service providers are well
-equipped with the hardware and software infrastructure to provide better services because of the aspect of Distributed computing. 
+Due to the cloud computing revolution in computing, today’s world has increasingly moved to cloud-based services rather than maintaining their own infrastructure. The cloud service providers are well equipped with the hardware and software infrastructure to provide better services by applying concepts of {\it Distributed Computing}. 
 
-In this model of computing one of the main problems that the providers has to face is the concurrent transactions. How the system behave when multiple users access the same object at the same 
-time and manipulates them. How to maintain the proper order of commit and how to resolve conflicting manipulations. Here in this paper we are going to address this problem deeper and propose 
-a solution which can be implemented and evaluated during next few weeks ahead.
+In this model of computing, one of the main problems that providers face is concurrent transactions; how the system behaves when multiple users access/manipulates an object at the same time; how to maintain the proper order of commit and how to resolve conflicting operations. This paper addresses such issues in detail and suggests possible solutions for implementation.
 
 In the following sections the implementation of a distributed software transactional memory library is presented for two scenarios: \\
 a) perfect Master, Servers and links \\
@@ -113,7 +111,7 @@ The Coordinator's responsibilities below are shared in both scenarios:
 \item interface with the participant servers in the transaction during the voting and commit phases 
 \end{itemize}
 
-The Master also assumes the role of a failure detectore through the use of heartbeat messages. In the fault-tolerant environment, the Master also assumes the Coordinator role.
+The Master also assumes the role of a failure detector through the use of heartbeat messages. In the fault-tolerant environment, the Master also assumes the Coordinator role.
 %------------------------------------------------------------------------- 
 \Section{Algorithms}
 \label{sec:algor}
@@ -235,7 +233,7 @@ When the failed server {\bf recovers}:
 Across the sections we discussed the solutions proposed in order to implement Distributed Software Transactional Memory System.
 Our solution addresses two scenarios: perfect links and processes and a fault tolerant system.
 A very important goal has been to provide a simple solution which would eliminate conflicts in transactions without encountering the inefficiency of a distributed environment. 
-The sections and subsections address each of the two architectures individually in order to provided a clearer distinction of responsibilities and complexity of the system.
+The sections and subsections address each of the two architectures individually in order to provide a clearer distinction of responsibilities and complexity of the system.
 Furthermore,{\it Timestamp Ordering} based concurrency control aids in eliminating local and global deadlocks which represents one of the major issues that need to be addressed in DSTMs.
 
 Finally, we believe that the concepts we came across in the discussion of this paper builds a firm foundation for implementing this solution in an efficient manner.
