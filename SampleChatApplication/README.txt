@@ -1,0 +1,1 @@
+Clients App.config file should include the IP of the chat server
