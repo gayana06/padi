@@ -1,0 +1,6 @@
+E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\PADI_LIBRARY\bin\Debug\PADI_LIBRARY.dll
+E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\PADI_LIBRARY\bin\Debug\PADI_LIBRARY.pdb
+E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\PADI_LIBRARY\obj\Debug\PADI_LIBRARY.dll
+E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\PADI_LIBRARY\obj\Debug\PADI_LIBRARY.pdb
+E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\PADI_LIBRARY\bin\Debug\log4net.dll
+E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\PADI_LIBRARY\obj\Debug\PADI_LIBRARY.csprojResolveAssemblyReference.cache
