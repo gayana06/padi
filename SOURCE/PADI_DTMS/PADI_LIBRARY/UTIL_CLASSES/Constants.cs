@@ -14,6 +14,7 @@ namespace PADI_LIBRARY
         public const string STR_PORT = "port";
 
         public const char SEP_CHAR_COMMA = ',';
+        public const char SEP_CHAR_COLON = ':';
         
 
         public const string APPSET_MASTER_IP="MASTER_IP";

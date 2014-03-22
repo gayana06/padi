@@ -13,6 +13,13 @@ namespace PADI_LIBRARY
         private const string PREFIX_WORKER_SERVER = "W_SERVER_";
         private List<ObjectServer> workerServerList;
         private Dictionary<string, DateTime> objectServerHeartBeatTimeStamp;
+        private long latestWorkerServerViewTimeStamp = 0;
+
+        public long LatestWorkerServerViewTimeStamp
+        {
+            get { return latestWorkerServerViewTimeStamp; }
+            set { latestWorkerServerViewTimeStamp = value; }
+        }
 
         public List<ObjectServer> WorkerServerList
         {
@@ -67,6 +74,7 @@ namespace PADI_LIBRARY
 
                 workerServerList.Add(wserver);
                 hasNotification = true;
+                LatestWorkerServerViewTimeStamp = DateTime.Now.Ticks;
                 Monitor.PulseAll(this);
                 return wserver;
             }

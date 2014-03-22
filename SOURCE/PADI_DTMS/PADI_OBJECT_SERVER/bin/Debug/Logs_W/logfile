@@ -24,3 +24,8 @@
 2014-03-22 01:50:22,888 [5] INFO  New Object Server List received,,
 2014-03-22 01:50:22,890 [1] INFO  Worker server :W_SERVER_1 started,Port : 25051,Bootstrap status:True
 2014-03-22 01:51:02,897 [6] INFO  New Object Server List received,,
+2014-03-22 21:53:25,150 [1] INFO  Worker started-----:,3/22/2014 9:53:25 PM,
+2014-03-22 21:53:25,214 [5] INFO  New Object Server List received,,
+2014-03-22 21:53:25,216 [1] INFO  Worker server :W_SERVER_1 started,Port : 25050,Bootstrap status:True
+2014-03-22 22:00:18,163 [10] INFO  New Object Server List received,,
+2014-03-22 22:00:47,735 [10] INFO  New Object Server List received,,

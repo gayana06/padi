@@ -11,6 +11,16 @@ namespace TestSolution
         static void Main(string[] args)
         {
            // DateTimeDiffCheck();
+            CheckTicks();
+        }
+
+        public static void CheckTicks()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                Console.WriteLine("Ticks : " +DateTime.Now.Ticks);
+                Thread.Sleep(1);
+            }
         }
 
         public static void DateTimeDiffCheck()

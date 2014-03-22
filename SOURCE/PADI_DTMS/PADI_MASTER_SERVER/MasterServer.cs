@@ -17,6 +17,7 @@ namespace PADI_MASTER_SERVER
     {
         TcpChannel masterChannel;
         PADI_Master master;
+        PADI_Coordinator coordinator;
 
         public MasterServer()
         {
@@ -35,8 +36,10 @@ namespace PADI_MASTER_SERVER
                 props[Constants.STR_PORT] = Int16.Parse(masterPort);
                 masterChannel = new TcpChannel(props, null, provider);
                 master = new PADI_Master();
+                coordinator = new PADI_Coordinator(master);
                 ChannelServices.RegisterChannel(masterChannel, false);
                 RemotingServices.Marshal(master, Constants.OBJECT_TYPE_PADI_MASTER, typeof(PADI_Master));
+                RemotingServices.Marshal(coordinator,Constants.OBJECT_TYPE_PADI_COORDINATOR,typeof(PADI_Coordinator));
                 Thread notificationThread = new Thread(new ThreadStart(NotifyObjectServer));
                 notificationThread.Start();
                 failDetectorTimer = new System.Threading.Timer(DetectObjectServerFailure, null, long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_OBJ_SERVER_FAIL_DECTOR_FREQUENCY]), long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_OBJ_SERVER_FAIL_DECTOR_FREQUENCY]));
