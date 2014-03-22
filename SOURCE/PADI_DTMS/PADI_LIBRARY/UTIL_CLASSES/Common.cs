@@ -43,7 +43,7 @@ namespace PADI_LIBRARY
         {
             string ip=ConfigurationManager.AppSettings[Constants.APPSET_MASTER_IP];
             string port = ConfigurationManager.AppSettings[Constants.APPSET_MASTER_PORT];
-            string objectName = ConfigurationManager.AppSettings[Constants.OBJECT_TYPE_PADI_MASTER];
+            string objectName = Constants.OBJECT_TYPE_PADI_MASTER;
             return GenerateTcpUrl(ip, port, objectName);
         }
 
@@ -66,6 +66,16 @@ namespace PADI_LIBRARY
                 }
             }
             return localIP;
+        }
+
+        public static ObjectServer GetObjectServerByName(string serverName, List<ObjectServer> objectServerList)
+        {
+            ObjectServer server = null;
+            if (objectServerList.Count > 0)
+            {
+                server=objectServerList.Single(s => s.ServerName == serverName);
+            }
+            return server;
         }
     }
 }
