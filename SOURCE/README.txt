@@ -3,6 +3,8 @@ Current source includes,
 2. Heartbeat messages between M and S
 3. Failure detection when S leave.
 4. Master's worker server view dissamination.
+5. Coordinator provides TID.
+6. Client request a TID.
 
 To test current flow,
 1. Run Master first.
@@ -10,5 +12,6 @@ To test current flow,
 3. Examin the Master console.
 4. Close a worker server.
 5. Notice the failure detection in Master console.
+
 
 Note: Time durations related to fail detection are define in App.config file of PADI_MasterServer project.
