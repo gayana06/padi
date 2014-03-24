@@ -5,6 +5,7 @@ using System.Text;
 
 namespace PADI_LIBRARY.UTIL_CLASSES
 {
+    [Serializable()]
     public class PadInt
     {
         private int uid;
@@ -23,11 +24,22 @@ namespace PADI_LIBRARY.UTIL_CLASSES
             set { this.value = value; }
         }
 
+        private DateTime timestamp;
+
+        public DateTime Timestamp
+        {
+            get { return this.timestamp; }
+            set { this.timestamp = value; }
+        }
+
         public PadInt(int uid, int value)
         {
             this.uid = uid;
             this.value = value;
         }
+
+        public PadInt()
+        { }
 
     }
 }
