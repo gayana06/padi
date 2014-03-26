@@ -5,7 +5,7 @@ using System.Text;
 
 namespace PADI_LIBRARY.UTIL_CLASSES
 {
-    [Serializable()]
+    [Serializable]
     public class PadInt
     {
         private int uid;
