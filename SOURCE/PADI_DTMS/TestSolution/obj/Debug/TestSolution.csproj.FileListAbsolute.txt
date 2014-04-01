@@ -2,4 +2,3 @@ E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PRO
 E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestSolution\bin\Debug\TestSolution.pdb
 E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestSolution\obj\Debug\TestSolution.exe
 E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestSolution\obj\Debug\TestSolution.pdb
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestSolution\obj\Debug\TestSolution.csprojResolveAssemblyReference.cache

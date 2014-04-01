@@ -10,16 +10,19 @@ namespace PADI_CLIENT
 {
     class Client
     {
-        PADI_Coordinator coordinator;
-        PADI_Master master;
-        Information info;
-        public Client()
+
+        public void Start()
         {
-            //TODO:Load the Info object when start and save it when client exit. Currently new object is created.
-            info = new Information();
-            StartClientTransactions();
+            PADI_Client client = new PADI_Client();
+            client.BeginTxn();
+            client.CreatePadInt(1);
+            client.Write(1,10);
+            client.TxCommit(1);
         }
 
+
+
+/*
         public void StartClientTransactions()
         {
             try
@@ -29,7 +32,15 @@ namespace PADI_CLIENT
                     long tid = BeginTxn();
                     Console.WriteLine("Trancation ID received:" + tid);
                     Thread.Sleep(7000);
-                }
+                } 
+                Thread t1 = new Thread(new ThreadStart(TransactionA));
+                t1.Start();
+                Thread.Sleep(2000);
+                Thread t2 = new Thread(new ThreadStart(TransactionB));
+                t2.Start();
+                Thread.Sleep(2000);
+                master.DumpObjectServerStatus();
+
                 
             }
             catch (Exception ex)
@@ -38,55 +49,56 @@ namespace PADI_CLIENT
             }
         }
 
-
-        /// <summary>
-        /// Get the TID from coordinator and load server map if the available map is expired
-        /// </summary>
-        /// <returns></returns>
-        public long BeginTxn()
+        public void TransactionA()
         {
-            coordinator=(PADI_Coordinator)Activator.GetObject(typeof(PADI_Coordinator),Common.GenerateTcpUrl(ConfigurationManager.AppSettings[Constants.APPSET_MASTER_IP],ConfigurationManager.AppSettings[Constants.APPSET_MASTER_PORT],Constants.OBJECT_TYPE_PADI_COORDINATOR));
-            string tidReply = coordinator.BeginTxn();
-            Console.WriteLine("Coordinator reply : "+tidReply);
-            string[] tempSep = tidReply.Split(Constants.SEP_CHAR_COLON);
-            long receivedTimeStamp =long.Parse(tempSep[1]);
-            if (receivedTimeStamp != info.AvailableMasterMapTimeStamp)
+            long tid = BeginTxn();
+            PadInt p = CreatePadInt(1);
+            p.Write(tid, 10);
+            //Thread.Sleep(2000);
+            PadInt pp = CreatePadInt(2);
+            pp.Write(tid, 20);            
+            testcommit(tid);
+           // master.DumpObjectServerStatus();
+
+            Thread.Sleep(10000);
+            tid = BeginTxn();
+            p = AccessPadInt(1);
+            Console.WriteLine("Read val for uid1 in A " +p.Read(tid));
+        }
+        public void TransactionB()
+        {
+            long tid = BeginTxn();
+            PadInt p = AccessPadInt(1);
+            p.Write(tid, 100);
+           // Thread.Sleep(2000);
+            PadInt pp = AccessPadInt(2);
+            pp.Write(tid, 200);
+            Console.WriteLine("Read val for uid1 in B" + p.Read(tid));
+            testcommit(tid);
+           // master.DumpObjectServerStatus();
+        }
+
+        public bool testcommit(long TID)
+        {
+            lock (this)
             {
-                info.AvailableMasterMapTimeStamp = receivedTimeStamp;
-                LoadServerMap();
+                bool b = false;
+                  foreach (var worker in workers)
+                  {
+                      b = worker.CanCommit(TID);
+
+                  }
+                foreach (var worker in workers)
+                {
+                    b = worker.DoCommit(TID);
+
+                }
+                return b;
             }
-            return long.Parse(tempSep[0]);
         }
-
-        public void LoadServerMap()
-        {            
-            master = (PADI_Master)Activator.GetObject(typeof(PADI_Master), Common.GetMasterTcpUrl());
-            info.ObjectServerMap = master.WorkerServerList.ToArray();
-            Console.WriteLine("Loaded the new map, size="+info.ObjectServerMap.Count());
-        }
-
+        */
+        
 
     }
 
-    [Serializable]
-    class Information
-    {
-        private long availableMasterMapTimeStamp;
-
-        public long AvailableMasterMapTimeStamp
-        {
-            get { return availableMasterMapTimeStamp; }
-            set { availableMasterMapTimeStamp = value; }
-        }
-
-        private ObjectServer[] objectServerMap;
-
-        public ObjectServer[] ObjectServerMap
-        {
-            get { return objectServerMap; }
-            set { objectServerMap = value; }
-        }
-
-
-    }
 }

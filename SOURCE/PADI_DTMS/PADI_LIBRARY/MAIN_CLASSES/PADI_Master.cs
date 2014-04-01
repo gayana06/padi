@@ -107,9 +107,22 @@ namespace PADI_LIBRARY
         }
 
 
-
-
-
+        public void DumpObjectServerStatus()
+        {
+            PADI_Worker worker;
+            foreach (var server in WorkerServerList)
+            {
+                try
+                {
+                    worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(server.ServerIp, server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                    worker.DumpStatus();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Worker server has left but not yet detected by the master. "+ex.Message);
+                }
+            }
+        }
 
     }
 }
