@@ -11,12 +11,12 @@ namespace PADI_LIBRARY
     {
         private ObjectServer[] objectServerList;
 
-        private Dictionary<int,PadInt> padIntActiveList;
-       // private Dictionary<int, PadInt> padIntInactiveList;
+        private Dictionary<int,ServerPadInt> padIntActiveList;
+       // private Dictionary<int, ServerPadInt> padIntInactiveList;
         
         public PADI_Worker()
         {
-            padIntActiveList = new Dictionary<int,PadInt>();
+            padIntActiveList = new Dictionary<int,ServerPadInt>();
            
         }
 
@@ -36,20 +36,20 @@ namespace PADI_LIBRARY
             Common.Logger().LogInfo("New Object Server List received",string.Empty,string.Empty);
         }
 
-        public PadInt CreatePadInt(int uid)
+        public ServerPadInt CreatePadInt(int uid)
         {
-            PadInt newPadInt = null;
+            ServerPadInt newPadInt = null;
             if (!padIntActiveList.ContainsKey(uid))
             {
-                newPadInt = new PadInt(uid,this);
+                newPadInt = new ServerPadInt(uid,this);
                 padIntActiveList.Add(uid, newPadInt);
             }
             return newPadInt;
         }
 
-        public PadInt AccessPadInt(int uid)
+        public ServerPadInt AccessPadInt(int uid)
         {
-            PadInt padInt=null;
+            ServerPadInt padInt=null;
             if (padIntActiveList.ContainsKey(uid))
                 padInt = padIntActiveList[uid];
             return padInt;
@@ -155,11 +155,11 @@ namespace PADI_LIBRARY
     {
         private ObjectServer[] objectServerList;
 
-        PadInt padint ;
-        PadInt tentativePadint;
+        ServerPadInt padint ;
+        ServerPadInt tentativePadint;
 
-        private List<PadInt> storedObjects = new List<PadInt>();
-        private List<PadInt> tentativeVersions = new List<PadInt>();
+        private List<ServerPadInt> storedObjects = new List<ServerPadInt>();
+        private List<ServerPadInt> tentativeVersions = new List<ServerPadInt>();
 
         DateTime timestamp;
         DateTime oldTimestamp;
@@ -198,7 +198,7 @@ namespace PADI_LIBRARY
                 else
                 {
                     timestamp = GetCurrentTime();
-                    padint = new PadInt(uid, value);
+                    padint = new ServerPadInt(uid, value);
                     padint.Timestamp = timestamp;
 
                     storedObjects.Add(padint);
@@ -215,7 +215,7 @@ namespace PADI_LIBRARY
         /// <param name="uid"></param>
         /// </summary>
         /// <returns>value or 0</returns>
-        public PadInt AccessPadInt(int uid)
+        public ServerPadInt AccessPadInt(int uid)
         {
             if (storedObjects.Exists(x => x.Uid == uid))
                 return storedObjects.Find(x => x.Uid == uid);
@@ -248,7 +248,7 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool Read(int uid, int value)
         {
-            PadInt original = AccessPadInt(uid);
+            ServerPadInt original = AccessPadInt(uid);
             if (original != null)
                 if (TxtBegin(original, value))
                     return true; //the read can proceed
@@ -259,7 +259,7 @@ namespace PADI_LIBRARY
 
         }
 
-        public bool TxtBegin(PadInt original, int value)
+        public bool TxtBegin(ServerPadInt original, int value)
         {
             currentTimestamp = GetCurrentTime();
             oldTimestamp = original.Timestamp;
@@ -293,11 +293,11 @@ namespace PADI_LIBRARY
     {
         private ObjectServer[] objectServerList;
 
-        PadInt padint;
-        PadInt tentativePadint;
+        ServerPadInt padint;
+        ServerPadInt tentativePadint;
 
-        private List<PadInt> storedObjects = new List<PadInt>();
-        private List<PadInt> tentativeVersions = new List<PadInt>();
+        private List<ServerPadInt> storedObjects = new List<ServerPadInt>();
+        private List<ServerPadInt> tentativeVersions = new List<ServerPadInt>();
 
         DateTime timestamp;
         DateTime rts; // Read timestamp
@@ -343,7 +343,7 @@ namespace PADI_LIBRARY
                 else
                 {
                     timestamp = GetCurrentTime();
-                    padint = new PadInt();
+                    padint = new ServerPadInt();
                     padint.Uid = uid;
                     padint.Value = value;
                     padint.Timestamp = timestamp;
@@ -362,7 +362,7 @@ namespace PADI_LIBRARY
         /// <param name="uid"></param>
         /// </summary>
         /// <returns>value or 0</returns>
-        public PadInt AccessPadInt(int uid)
+        public ServerPadInt AccessPadInt(int uid)
         {
             if (storedObjects.Exists(x => x.Uid == uid))
                 return storedObjects.Find(x => x.Uid == uid);
@@ -394,7 +394,7 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool Read(int uid)
         {
-            PadInt original = AccessPadInt(uid);
+            ServerPadInt original = AccessPadInt(uid);
             if (original != null)
             {
                 cts = GetCurrentTime();
@@ -433,7 +433,7 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool Write(int uid)
         {
-            PadInt original = AccessPadInt(uid);
+            ServerPadInt original = AccessPadInt(uid);
             if (original != null)
             {
                 cts = GetCurrentTime();

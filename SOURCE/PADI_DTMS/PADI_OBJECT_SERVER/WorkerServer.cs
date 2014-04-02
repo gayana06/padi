@@ -39,7 +39,7 @@ namespace PADI_OBJECT_SERVER
                 ChannelServices.RegisterChannel(workerChannel, false);
                 RemotingServices.Marshal(worker, Constants.OBJECT_TYPE_PADI_WORKER, typeof(PADI_Worker));
 
-               // RemotingConfiguration.RegisterWellKnownServiceType(typeof(PadInt),Constants.OBJECT_TYPE_PADINT,WellKnownObjectMode.Singleton);
+               // RemotingConfiguration.RegisterWellKnownServiceType(typeof(ServerPadInt),Constants.OBJECT_TYPE_PADINT,WellKnownObjectMode.Singleton);
                 bool isBootStraped = BootstrapMaster(workerPort);
                 timer = new System.Threading.Timer(SendHeartBeatMessage, null, long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_HEARTBEAT_PERIOD]), long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_HEARTBEAT_PERIOD]));
                 Console.WriteLine("Worker server :" + thisServer.ServerName + "started. Bootstrap status:"+isBootStraped);

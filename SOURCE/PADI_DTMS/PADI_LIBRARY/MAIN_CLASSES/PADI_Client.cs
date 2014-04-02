@@ -14,7 +14,12 @@ namespace PADI_LIBRARY
         List<PADI_Worker> workers;
         Information info;
         long transactionId;
-        Dictionary<int, PadInt> clientAccessedPadInts;
+
+        public long TransactionId
+        {
+            get { return transactionId; }
+            set { transactionId = value; }
+        }
 
         public PADI_Client()
         {
@@ -23,7 +28,6 @@ namespace PADI_LIBRARY
             master = (PADI_Master)Activator.GetObject(typeof(PADI_Master), Common.GetMasterTcpUrl());
             workers = new List<PADI_Worker>();
             info = new Information();
-            clientAccessedPadInts = new Dictionary<int, PadInt>();
         }
 
         /// <summary>
@@ -39,12 +43,17 @@ namespace PADI_LIBRARY
         {
             lock (this)
             {
-                int modIndex = GetModuloServer(uid);
                 PadInt padInt = null;
+                int modIndex = GetModuloServer(uid);
+                ServerPadInt serverPadInt = null;
                 if (modIndex >= 0)
                 {
-                    padInt = workers[modIndex].CreatePadInt(uid);
-                    clientAccessedPadInts.Add(uid, padInt);
+                    serverPadInt = workers[modIndex].CreatePadInt(uid);
+                    if (serverPadInt != null)
+                    {
+                        padInt = new PadInt(uid,this);
+                        padInt.SvrPadInt = serverPadInt;
+                    }
                 }
                 else
                     Console.WriteLine("No object servers found");
@@ -58,27 +67,20 @@ namespace PADI_LIBRARY
             {
                 int modIndex = GetModuloServer(uid);
                 PadInt padInt = null;
+                ServerPadInt serverPadInt;
                 if (modIndex >= 0)
                 {
-                    padInt = workers[modIndex].AccessPadInt(uid);
-                    clientAccessedPadInts.Add(uid, padInt);
+                    serverPadInt = workers[modIndex].AccessPadInt(uid);
+                    if (serverPadInt != null)
+                    {
+                        padInt = new PadInt(uid, this);
+                        padInt.SvrPadInt = serverPadInt;
+                    }
                 }
                 else
                     Console.WriteLine("No object servers found");
                 return padInt;
             }
-        }
-
-        public int Read(int uid)
-        {
-            PadInt padInt = clientAccessedPadInts[uid];
-            return padInt.Read(transactionId);
-        }
-
-        public void Write(int uid, int value)
-        {
-            PadInt padInt = clientAccessedPadInts[uid];
-            padInt.Write(transactionId,value);
         }
 
         /// <summary>
@@ -101,7 +103,7 @@ namespace PADI_LIBRARY
                         info.AvailableMasterMapTimeStamp = receivedTimeStamp;
                         LoadServerMap();
                     }
-                    transactionId=long.Parse(tempSep[0]);
+                    TransactionId=long.Parse(tempSep[0]);
                     trancationEstablished=true;
                 }
                 catch(Exception ex)
@@ -112,13 +114,11 @@ namespace PADI_LIBRARY
             }
         }
 
-        public bool TxCommit(int uid)
+        public bool TxCommit()
         {
             bool isCommited = false;
-            //TODO:Call coordinator.
-
-            PadInt padInt = clientAccessedPadInts[uid];
-            padInt.Commit(transactionId);
+            //TODO:Call coordinator. To proceed the commit. For testing only hardcoded the below.
+            isCommited=workers[0].DoCommit(TransactionId);
             master.DumpObjectServerStatus();
             return isCommited;
         }

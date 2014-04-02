@@ -14,7 +14,6 @@ namespace PADI_CLIENT
             Common.Logger().LogInfo("Client started",string.Empty,string.Empty);
             Client client = new Client();
             client.Start();
-
         }
     }
 }

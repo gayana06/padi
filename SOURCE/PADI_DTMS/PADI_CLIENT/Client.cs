@@ -14,10 +14,10 @@ namespace PADI_CLIENT
         public void Start()
         {
             PADI_Client client = new PADI_Client();
-            client.BeginTxn();
-            client.CreatePadInt(1);
-            client.Write(1,10);
-            client.TxCommit(1);
+            bool isTransactionCreated=client.BeginTxn();
+            PadInt padInt= client.CreatePadInt(1);
+            padInt.Write(10);
+            bool isCommited=client.TxCommit();
         }
 
 
@@ -52,10 +52,10 @@ namespace PADI_CLIENT
         public void TransactionA()
         {
             long tid = BeginTxn();
-            PadInt p = CreatePadInt(1);
+            ServerPadInt p = CreatePadInt(1);
             p.Write(tid, 10);
             //Thread.Sleep(2000);
-            PadInt pp = CreatePadInt(2);
+            ServerPadInt pp = CreatePadInt(2);
             pp.Write(tid, 20);            
             testcommit(tid);
            // master.DumpObjectServerStatus();
@@ -68,10 +68,10 @@ namespace PADI_CLIENT
         public void TransactionB()
         {
             long tid = BeginTxn();
-            PadInt p = AccessPadInt(1);
+            ServerPadInt p = AccessPadInt(1);
             p.Write(tid, 100);
            // Thread.Sleep(2000);
-            PadInt pp = AccessPadInt(2);
+            ServerPadInt pp = AccessPadInt(2);
             pp.Write(tid, 200);
             Console.WriteLine("Read val for uid1 in B" + p.Read(tid));
             testcommit(tid);

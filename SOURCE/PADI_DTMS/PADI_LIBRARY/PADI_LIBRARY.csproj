@@ -52,6 +52,7 @@
     <Compile Include="UTIL_CLASSES\Common.cs" />
     <Compile Include="UTIL_CLASSES\Constants.cs" />
     <Compile Include="UTIL_CLASSES\PadInt.cs" />
+    <Compile Include="UTIL_CLASSES\ServerPadInt.cs" />
     <Compile Include="UTIL_CLASSES\ObjectServer.cs" />
     <Compile Include="UTIL_CLASSES\TentativePadInt.cs" />
   </ItemGroup>

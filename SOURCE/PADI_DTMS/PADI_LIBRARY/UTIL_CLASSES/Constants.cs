@@ -29,7 +29,7 @@ namespace PADI_LIBRARY
         public const string OBJECT_TYPE_PADI_MASTER = "PADI_Master";
         public const string OBJECT_TYPE_PADI_CLIENT="PADI_Client";
         public const string OBJECT_TYPE_PADI_COORDINATOR = "PADI_Coordinator";
-        public const string OBJECT_TYPE_PADINT = "PadInt";
+        public const string OBJECT_TYPE_PADINT = "ServerPadInt";
         
     }
 }
