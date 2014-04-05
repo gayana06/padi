@@ -12,6 +12,8 @@ namespace PADI_LIBRARY
         PADI_Coordinator coordinator;
         PADI_Master master;
         List<PADI_Worker> workers;
+        List<int> padIntUids;
+
         Information info;
         long transactionId;
 
@@ -28,6 +30,7 @@ namespace PADI_LIBRARY
             master = (PADI_Master)Activator.GetObject(typeof(PADI_Master), Common.GetMasterTcpUrl());
             workers = new List<PADI_Worker>();
             info = new Information();
+            padIntUids = new List<int>();
         }
 
         /// <summary>
@@ -44,7 +47,7 @@ namespace PADI_LIBRARY
             lock (this)
             {
                 PadInt padInt = null;
-                int modIndex = GetModuloServer(uid);
+                int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
                 ServerPadInt serverPadInt = null;
                 if (modIndex >= 0)
                 {
@@ -53,6 +56,9 @@ namespace PADI_LIBRARY
                     {
                         padInt = new PadInt(uid,this);
                         padInt.SvrPadInt = serverPadInt;
+                        //keep track of padIntUids
+                        padIntUids.Add(padInt.UID);
+                        Console.WriteLine("Object successfully created!");
                     }
                 }
                 else
@@ -65,7 +71,7 @@ namespace PADI_LIBRARY
         {
             lock (this)
             {
-                int modIndex = GetModuloServer(uid);
+                int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
                 PadInt padInt = null;
                 ServerPadInt serverPadInt;
                 if (modIndex >= 0)
@@ -75,6 +81,9 @@ namespace PADI_LIBRARY
                     {
                         padInt = new PadInt(uid, this);
                         padInt.SvrPadInt = serverPadInt;
+                        //Keep track of padIntUids
+                        Console.WriteLine("Object successfully retrieved!");
+                        padIntUids.Add(padInt.UID);
                     }
                 }
                 else
@@ -114,24 +123,20 @@ namespace PADI_LIBRARY
             }
         }
 
+        public bool Status()
+        {
+            master.DumpObjectServerStatus();
+            return true;
+        }
+
         public bool TxCommit()
         {
             bool isCommited = false;
             //TODO:Call coordinator. To proceed the commit. For testing only hardcoded the below.
-            isCommited=workers[0].DoCommit(TransactionId);
-            master.DumpObjectServerStatus();
+            int[] uidArray = padIntUids.ToArray();
+            isCommited = coordinator.Commit(TransactionId, uidArray);
+           // isCommited=workers[0].DoCommit(TransactionId);
             return isCommited;
-        }
-
-        private int GetModuloServer(int uid)
-        {
-            lock (this)
-            {
-                int index = -1;
-                if (info.ObjectServerMap.Length > 0)
-                    index = uid % info.ObjectServerMap.Length;
-                return index;
-            }
         }
 
         private void LoadServerMap()

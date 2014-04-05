@@ -15,9 +15,12 @@ namespace PADI_CLIENT
         {
             PADI_Client client = new PADI_Client();
             bool isTransactionCreated=client.BeginTxn();
-            PadInt padInt= client.CreatePadInt(1);
+            PadInt padInt = client.CreatePadInt(1);
+           // PadInt padInt = client.AccessPadInt(1);
             padInt.Write(10);
             bool isCommited=client.TxCommit();
+            Console.ReadLine();
+           // client.Status();
         }
 
 

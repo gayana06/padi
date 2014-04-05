@@ -47,6 +47,14 @@ namespace PADI_LIBRARY
             return GenerateTcpUrl(ip, port, objectName);
         }
 
+        public static int GetModuloServerIndex(int uid, ObjectServer[] objectServerMap)
+        {
+
+                int index = -1;
+                if (objectServerMap.Length > 0)
+                    index = uid % objectServerMap.Length;
+                return index;
+        }
 
         /// <summary>
         /// Get Local Ip address

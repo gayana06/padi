@@ -9,11 +9,13 @@ namespace PADI_LIBRARY
     public class PADI_Coordinator : MarshalByRefObject
     {
         PADI_Master master;
-        List<long> transactionIdList;
+       // List<long> transactionIdList;
+        Dictionary<long, List<CommitRequestStatus>> transactionIdDict;
+
         public PADI_Coordinator(PADI_Master master)
         {
             this.master=master;
-            transactionIdList=new List<long>();
+            transactionIdDict=new Dictionary<long, List<CommitRequestStatus>>();
         }
 
         /// <summary>
@@ -26,12 +28,59 @@ namespace PADI_LIBRARY
             {
                 Thread.Sleep(1);
                 long tid=DateTime.Now.Ticks;
-                transactionIdList.Add(tid);
+                transactionIdDict.Add(tid, new List<CommitRequestStatus>());
                 return tid;
             }
 
         }
 
+        public bool Commit(long tid, int[] uidArray)
+        {
+            ObjectServer selectedServer;
+            CommitRequestStatus commitRS;
+            bool finished = false;
+
+            foreach (var uid in uidArray)
+            {
+                selectedServer = master.WorkerServerList[uid % master.WorkerServerList.Count()];
+                commitRS = new CommitRequestStatus();
+                commitRS.Server = selectedServer;
+                commitRS.Vote = false;
+                transactionIdDict[tid].Add(commitRS);
+            }
+
+            PADI_Worker worker;
+            foreach (var commitR in transactionIdDict[tid])
+            {
+                worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(commitR.Server.ServerIp, commitR.Server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                commitR.Vote = worker.CanCommit(tid);
+            }
+
+            if (transactionIdDict[tid].Exists(x => x.Vote == false))
+            {
+                //TODO Send Abort to all the servers
+            }
+            else
+            {
+                foreach (var commitR in transactionIdDict[tid])
+                {
+                    worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(commitR.Server.ServerIp, commitR.Server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                    commitR.HasCommited = worker.DoCommit(tid);
+                }
+
+                //TODO After everyone commits update the replicas
+                if (transactionIdDict[tid].Exists(x => x.HasCommited == false))
+                {
+                    finished = false;
+                }
+                else
+                {
+                    finished = true;
+                }
+
+            }
+            return finished;
+        }
         /// <summary>
         /// Create a Transaction in the below format.
         /// TID:TIMESTAMP_WS_MAP
