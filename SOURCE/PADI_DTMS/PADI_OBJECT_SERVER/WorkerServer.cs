@@ -1,4 +1,6 @@
-﻿using System;
+﻿#region Directive Section
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,13 +12,16 @@ using System.Runtime.Remoting;
 using System.Runtime.Serialization.Formatters;
 using System.Collections;
 
+#endregion
+
 namespace PADI_OBJECT_SERVER
 {
     class WorkerServer
     {
+        #region Initialization
+
         TcpChannel workerChannel;
-        PADI_Worker worker;
-        ObjectServer thisServer;
+        PADI_Worker worker;       
 
         public WorkerServer()
         {
@@ -38,12 +43,8 @@ namespace PADI_OBJECT_SERVER
                 worker = new PADI_Worker();
                 ChannelServices.RegisterChannel(workerChannel, false);
                 RemotingServices.Marshal(worker, Constants.OBJECT_TYPE_PADI_WORKER, typeof(PADI_Worker));
-
-               // RemotingConfiguration.RegisterWellKnownServiceType(typeof(ServerPadInt),Constants.OBJECT_TYPE_PADINT,WellKnownObjectMode.Singleton);
-                bool isBootStraped = BootstrapMaster(workerPort);
-                timer = new System.Threading.Timer(SendHeartBeatMessage, null, long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_HEARTBEAT_PERIOD]), long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_HEARTBEAT_PERIOD]));
-                Console.WriteLine("Worker server :" + thisServer.ServerName + "started. Bootstrap status:"+isBootStraped);
-                Common.Logger().LogInfo("Worker server :" + thisServer.ServerName + " started", "Port : " + workerPort, "Bootstrap status:"+isBootStraped);
+                bool isBootStraped = worker.BootstrapMaster(workerPort);
+                timer = new System.Threading.Timer(worker.SendHeartBeatMessage, null, long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_HEARTBEAT_PERIOD]), long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_HEARTBEAT_PERIOD]));
                 Console.ReadLine();
 
             }
@@ -59,28 +60,7 @@ namespace PADI_OBJECT_SERVER
             }
 
         }
-        
-        public bool BootstrapMaster(string workerPort)
-        {
-            bool isBootstraped = false;
-            String masterUrl = Common.GetMasterTcpUrl();
-            //String workerIp = Common.GetLocalIPAddress();
-            String workerIp=ConfigurationManager.AppSettings[Constants.APPSET_WORKER_IP];
-            PADI_Master masterObj = (PADI_Master)Activator.GetObject(typeof(PADI_Master), masterUrl);
-            thisServer=masterObj.Bootstrap(workerIp, workerPort);
-            if (thisServer!=null)
-            {
-                isBootstraped = true;
-            }
-            return isBootstraped;
-        }
 
-        public void SendHeartBeatMessage(object state)
-        {
-            PADI_Master master = (PADI_Master)Activator.GetObject(typeof(PADI_Master), Common.GetMasterTcpUrl());
-            master.HeartBeatReceiver(thisServer.ServerName);
-        }
-
-
+        #endregion
     }
 }

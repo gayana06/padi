@@ -1,13 +1,20 @@
-﻿using System;
+﻿#region Directive Section
+
+using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading;
+
+#endregion
 
 namespace PADI_LIBRARY
 {
     public class PADI_Master : MarshalByRefObject
     {
+        #region Initialization
+
         private int serverIndex = 0;
         private bool hasNotification = false;
         private const string PREFIX_WORKER_SERVER = "W_SERVER_";
@@ -44,6 +51,10 @@ namespace PADI_LIBRARY
             workerServerList = new List<ObjectServer>();
             objectServerHeartBeatTimeStamp = new Dictionary<string, DateTime>();
         }
+
+        #endregion
+
+        #region Public Members
 
         /// <summary>
         /// This make the lease to expire never.
@@ -106,7 +117,9 @@ namespace PADI_LIBRARY
             }
         }
 
-
+        /// <summary>
+        /// Ask object servers to dump the status to their consoles
+        /// </summary>
         public void DumpObjectServerStatus()
         {
             PADI_Worker worker;
@@ -123,6 +136,71 @@ namespace PADI_LIBRARY
                 }
             }
         }
+        
+        /// <summary>
+        /// If any new server arrived this method should notify all the object servers.
+        /// </summary>
+        public void NotifyObjectServer()
+        {
+            lock (this)
+            {
+                while (true)
+                {
+                    if (HasNotification)
+                    {
+                        PADI_Worker worker;
+                        foreach (var server in WorkerServerList)
+                        {
+                            try
+                            {
+                                worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(server.ServerIp, server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                                worker.ReceiveObjectServerList(WorkerServerList.ToArray());
+                            }
+                            catch (Exception ex)
+                            {
+                                //TODO: implement a retry mechanism if failed later if required. 
+                                Console.WriteLine(ex.Message);
+                                Common.Logger().LogError(ex.Message, "NotifyObjectServer() in PADI_MASTER", string.Empty);
+                            }
+                        }
+                        HasNotification = false;
+                    }
+                    else
+                    {
+                        Monitor.Wait(this);
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Detect a object server failure
+        /// </summary>
+        /// <param name="state"></param>
+        public void DetectObjectServerFailure(object state)
+        {
+            lock (this)
+            {
+                string failedServer = string.Empty;
+                foreach (var timeStamp in ObjectServerHeartBeatTimeStamp)
+                {
+                    if ((DateTime.Now.Subtract(timeStamp.Value).Seconds) * 1000 > int.Parse(ConfigurationManager.AppSettings[Constants.APPSET_OBJ_SERVER_FAIL_TIME]))
+                    {
+                        //TODO: failure detected what to do now
+                        failedServer = timeStamp.Key;
+                        Console.WriteLine("Failure detected server :" + timeStamp.Key);
+                        Common.Logger().LogInfo("Failure detected server :" + timeStamp.Key, string.Empty, string.Empty);
+                        break;
+                    }
+                }
+                if (!String.IsNullOrEmpty(failedServer))
+                {
+                    ObjectServerHeartBeatTimeStamp.Remove(failedServer);
+                    workerServerList.Remove(Common.GetObjectServerByName(failedServer,workerServerList));
+                }
+            }
+        }
 
+        #endregion
     }
 }

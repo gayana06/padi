@@ -1,12 +1,19 @@
-﻿using System;
+﻿#region Directive Section
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
+#endregion
+
 namespace PADI_LIBRARY
 {
-    public class ObjectServer : MarshalByRefObject
+    [Serializable]
+    public class ObjectServer
     {
+        #region Initialization
+
         private String serverName;
 
         public String ServerName
@@ -53,6 +60,7 @@ namespace PADI_LIBRARY
             get { return replicaServerName; }
             set { replicaServerName = value; }
         }
-        
+
+        #endregion
     }
 }

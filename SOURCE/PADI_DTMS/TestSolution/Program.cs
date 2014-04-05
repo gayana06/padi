@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PADI_LIBRARY;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,8 +14,29 @@ namespace TestSolution
             Program p = new Program();
            // DateTimeDiffCheck();
            // CheckTicks();
-            p.Call();
+           // p.Call();
+            p.TestException();
         }
+
+        public void TestException()
+        {
+            try
+            {
+                throw new TxException("This is test exception");
+            }
+            catch (TxException ex)
+            {
+                Console.WriteLine(ex.Message);
+                Console.WriteLine(ex.StackTrace);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message+"---------General");
+                Console.WriteLine(ex.StackTrace + "---------General");
+            }
+
+        }
+
 
         int WID = 4;
         int TID = 0;

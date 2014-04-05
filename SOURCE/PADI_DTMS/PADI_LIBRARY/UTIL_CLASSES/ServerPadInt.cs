@@ -1,15 +1,20 @@
-﻿using System;
+﻿#region Directive Section
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+
+#endregion
 
 namespace PADI_LIBRARY
 {
     
     public class ServerPadInt: MarshalByRefObject
     {
-        
+        #region Initialization
+
         public ServerPadInt(int uid,PADI_Worker worker)
         {
             this.uid = uid;
@@ -54,7 +59,6 @@ namespace PADI_LIBRARY
             set { isCommited = value; }
         }
 
-
         private List<long> readTSList;
 
         public List<long> ReadTSList
@@ -71,63 +75,114 @@ namespace PADI_LIBRARY
             set { tentativeList = value; }
         }
 
+        #endregion
 
-        public void Write(long TID, int value)
+        #region Public Members
+
+        /// <summary>
+        /// Do write on the object itself
+        /// </summary>
+        /// <param name="TID"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public bool Write(long TID, int value)
         {
             lock(this)
             {
+                bool isWriteSuccessful = false;
+                Console.WriteLine("\n---------------Write (START, TID="+TID+")-------------------");
+                Console.WriteLine("ReadTSList count = " + ReadTSList.Count());
+                Console.WriteLine("WriteTS = " + WriteTS);
+                Console.WriteLine("TID = "+TID);
                 if ((ReadTSList.Count() == 0 || TID >= ReadTSList.Max()) && TID > WriteTS)
                 {
                     if (TentativeList.Exists(x => x.WriteTS == TID))
                     {
                         TentativeList.First(x => x.WriteTS == TID).Value = value;
+                        Console.WriteLine("Already in tentativelist, value updated TID = " + TID + ", Value = " + value);
                     }
                     else
                     {
                         TentativePadInt tentative = new TentativePadInt(TID, value);
                         TentativeList.Add(tentative);
-                        Console.WriteLine("Added to tentativelist - "+TID);
+                        Console.WriteLine("Added to tentativelist TID = "+TID+", Value = "+value);
                     }
+                    isWriteSuccessful = true;
                 }
                 else
-                {
-                    Common.Logger().LogInfo("Write aborted TID=" + TID, string.Empty, string.Empty);
-                    throw new Exception("Write aborted TID=" + TID);
+                {                    
+                    TxAbort(TID);
+                    Console.WriteLine("Transaction aborts. TID = "+TID);
+                    Common.Logger().LogInfo("Write aborted TID=" + TID, string.Empty, string.Empty);                                      
                 }
+                Console.WriteLine("---------------Write (END, TID=" + TID + ")-------------------\n");
+                return isWriteSuccessful;
             }
+            
         }
-
-
-
+        
+        /// <summary>
+        /// Do read the object itself
+        /// </summary>
+        /// <param name="TID"></param>
+        /// <returns></returns>
         public int Read(long TID)
         {
             lock (this)
             {
+                Console.WriteLine("\n---------------Read (START, TID=" + TID + ")-------------------");           
                 int val=-1;
+                Console.WriteLine("TID = "+TID);
+                Console.WriteLine("WriteTS = " + WriteTS);
                 while (true)
                 {
                     if (WriteTS > 0 && TID > WriteTS)
                     {
                         if (TentativeList.Exists(x => x.WriteTS < TID))
                         {
+                            Console.WriteLine("Read operation waits. TID : "+TID);
                             Monitor.Wait(this);
                         }
                         else
                         {
                             val = Value;
+                            Console.WriteLine("Read Value = "+val+", TID = "+TID);
                             readTSList.Add(TID);
                             break;
                         }
                     }
                 }
+                Console.WriteLine("---------------Read (END, TID=" + TID + ")-------------------\n");           
                 return val;
             }
         }
 
+        /// <summary>
+        /// Remove tentative records from the object
+        /// </summary>
+        /// <param name="TID"></param>
+        /// <returns></returns>
+        public bool TxAbort(long TID)
+        {
+            bool isAbort = false;
+            if (TentativeList.Exists(x => x.WriteTS == TID))
+            {
+                TentativeList.Remove(TentativeList.Find(x=>x.WriteTS==TID));               
+                isAbort = true;
+            }
+            return isAbort;
+        }
+
+        /// <summary>
+        /// Check the commit is possible for a given transaction id
+        /// </summary>
+        /// <param name="TID"></param>
+        /// <returns></returns>
         public bool CanCommit(long TID)
         {
             lock (this)
-            {                                    
+            {
+                    
                 bool canCommit = false;
                 if (TentativeList.Exists(x => x.WriteTS == TID))
                 {
@@ -148,22 +203,29 @@ namespace PADI_LIBRARY
                 {
                     canCommit = true;
                 }
+ 
                 return canCommit;
             }
         }
 
+        /// <summary>
+        /// do commit on the object itself
+        /// </summary>
+        /// <param name="TID"></param>
+        /// <returns></returns>
         public bool Commit(long TID)
         {
             lock (this)
             {
                 bool isCommited = false;
+                Console.WriteLine("\n---------------Commit (START, TID=" + TID + ")-------------------");        
                 while (true)
                 {
                     if (TentativeList.Exists(x => x.WriteTS == TID))
                     {
                         if (TentativeList.Exists(x => x.WriteTS < TID))
                         {
-                            Console.WriteLine("Wait");
+                            Console.WriteLine("Wait TID = "+TID);
                             Monitor.Wait(this);
                         }
                         else
@@ -175,7 +237,7 @@ namespace PADI_LIBRARY
                             tentativeList.Remove(temp);
                             Monitor.PulseAll(this);
                             isCommited = true;                            
-                            Console.WriteLine("commited");
+                            Console.WriteLine("commited TID : "+TID+", Value = "+Value);
                             break;
                         }
                     }
@@ -186,9 +248,11 @@ namespace PADI_LIBRARY
                         break;
                     }
                 }
+                Console.WriteLine("---------------Commited (End, TID=" + TID + ")-------------------\n");        
                 return isCommited;
             }
         }
 
+        #endregion
     }
 }

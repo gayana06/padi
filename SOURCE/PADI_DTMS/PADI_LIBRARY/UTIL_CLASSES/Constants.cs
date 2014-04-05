@@ -1,12 +1,18 @@
-﻿using System;
+﻿#region Directive Section
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+
+#endregion
 
 namespace PADI_LIBRARY
 {
     public class Constants
     {
+        #region Initialization
+
         public const string TCP_HEADER = "tcp://";
         public const string SEP_COMMA = ",";
         public const string SEP_COLON = ":";
@@ -30,6 +36,7 @@ namespace PADI_LIBRARY
         public const string OBJECT_TYPE_PADI_CLIENT="PADI_Client";
         public const string OBJECT_TYPE_PADI_COORDINATOR = "PADI_Coordinator";
         public const string OBJECT_TYPE_PADINT = "ServerPadInt";
-        
+
+        #endregion
     }
 }

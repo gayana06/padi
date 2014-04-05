@@ -1,19 +1,23 @@
-﻿using System;
+﻿#region Directive Section
+
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
 using System.Text;
 
+#endregion
+
 namespace PADI_LIBRARY
 {
-    public class PADI_Client:  MarshalByRefObject
+    public class PADI_Client : MarshalByRefObject
     {
+        #region Initialization
 
         PADI_Coordinator coordinator;
         PADI_Master master;
         List<PADI_Worker> workers;
         List<int> padIntUids;
-
         Information info;
         long transactionId;
 
@@ -23,14 +27,28 @@ namespace PADI_LIBRARY
             set { transactionId = value; }
         }
 
-        public PADI_Client()
+        #endregion
+
+        #region Public Members
+
+        public bool Init()
         {
-            //TODO:Load the Info object when start and save it when client exit. Currently new object is created.
-            coordinator = (PADI_Coordinator)Activator.GetObject(typeof(PADI_Coordinator), Common.GenerateTcpUrl(ConfigurationManager.AppSettings[Constants.APPSET_MASTER_IP], ConfigurationManager.AppSettings[Constants.APPSET_MASTER_PORT], Constants.OBJECT_TYPE_PADI_COORDINATOR));
-            master = (PADI_Master)Activator.GetObject(typeof(PADI_Master), Common.GetMasterTcpUrl());
-            workers = new List<PADI_Worker>();
-            info = new Information();
-            padIntUids = new List<int>();
+            bool isInitSuccessful = false;
+            try
+            {
+                //TODO:Load the Info object when start and save it when client exit. Currently new object is created.
+                coordinator = (PADI_Coordinator)Activator.GetObject(typeof(PADI_Coordinator), Common.GenerateTcpUrl(ConfigurationManager.AppSettings[Constants.APPSET_MASTER_IP], ConfigurationManager.AppSettings[Constants.APPSET_MASTER_PORT], Constants.OBJECT_TYPE_PADI_COORDINATOR));
+                master = (PADI_Master)Activator.GetObject(typeof(PADI_Master), Common.GetMasterTcpUrl());
+                workers = new List<PADI_Worker>();
+                info = new Information();
+                padIntUids = new List<int>();
+                isInitSuccessful = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            return isInitSuccessful;
         }
 
         /// <summary>
@@ -42,52 +60,75 @@ namespace PADI_LIBRARY
             return null;
         }
 
+        /// <summary>
+        /// Create a ServerPadInt object in the remote server.
+        /// Returns null if creation failed.
+        /// </summary>
+        /// <param name="uid"></param>
+        /// <returns></returns>
         public PadInt CreatePadInt(int uid)
         {
             lock (this)
             {
                 PadInt padInt = null;
                 int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
-                ServerPadInt serverPadInt = null;
                 if (modIndex >= 0)
                 {
-                    serverPadInt = workers[modIndex].CreatePadInt(uid);
-                    if (serverPadInt != null)
+                    if (workers[modIndex].CreatePadInt(uid))
                     {
-                        padInt = new PadInt(uid,this);
-                        padInt.SvrPadInt = serverPadInt;
-                        //keep track of padIntUids
-                        padIntUids.Add(padInt.UID);
-                        Console.WriteLine("Object successfully created!");
+                        padInt = new PadInt(uid, this);
+                        padInt.Worker = workers[modIndex];
+                        UpdatePadIntTrack(uid);
+                        Console.WriteLine("PadInt successfully created, UID = " + uid);
+                        Common.Logger().LogInfo("PadInt successfully created, UID = " + uid, string.Empty, string.Empty);
+                    }
+                    else
+                    {
+                        Console.WriteLine("CreatePadInt for UID = " + uid + " returned null. Already exists");
+                        Common.Logger().LogInfo("CreatePadInt for UID = " + uid + " returned null. Already exists", string.Empty, string.Empty);
                     }
                 }
                 else
-                    Console.WriteLine("No object servers found");
+                {
+                    Console.WriteLine("No worker server found");
+                    Common.Logger().LogInfo("No worker server found", string.Empty, string.Empty);
+                }
                 return padInt;
             }
         }
 
+        /// <summary>
+        /// Already existing object server is selected for further manipulation. (Read/Write)
+        /// </summary>
+        /// <param name="uid"></param>
+        /// <returns></returns>
         public PadInt AccessPadInt(int uid)
         {
             lock (this)
             {
                 int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
                 PadInt padInt = null;
-                ServerPadInt serverPadInt;
                 if (modIndex >= 0)
                 {
-                    serverPadInt = workers[modIndex].AccessPadInt(uid);
-                    if (serverPadInt != null)
+                    if (workers[modIndex].AccessPadInt(uid))
                     {
                         padInt = new PadInt(uid, this);
-                        padInt.SvrPadInt = serverPadInt;
-                        //Keep track of padIntUids
-                        Console.WriteLine("Object successfully retrieved!");
-                        padIntUids.Add(padInt.UID);
+                        padInt.Worker = workers[modIndex];
+                        UpdatePadIntTrack(uid);
+                        Console.WriteLine("PadInt successfully retrieved, UID = " + uid);
+                        Common.Logger().LogInfo("PadInt successfully retrieved, UID = " + uid, string.Empty, string.Empty);
+                    }
+                    else
+                    {
+                        Console.WriteLine("AccessPadInt for UID = " + uid + " returned null. Not available");
+                        Common.Logger().LogInfo("AccessPadInt for UID = " + uid + " returned null. Not available", string.Empty, string.Empty);
                     }
                 }
                 else
-                    Console.WriteLine("No object servers found");
+                {
+                    Console.WriteLine("No worker servers found");
+                    Common.Logger().LogInfo("No worker servers found", string.Empty, string.Empty);
+                }
                 return padInt;
             }
         }
@@ -100,7 +141,7 @@ namespace PADI_LIBRARY
         {
             lock (this)
             {
-                bool trancationEstablished=false;
+                bool trancationEstablished = false;
                 try
                 {
                     string tidReply = coordinator.BeginTxn();
@@ -112,10 +153,10 @@ namespace PADI_LIBRARY
                         info.AvailableMasterMapTimeStamp = receivedTimeStamp;
                         LoadServerMap();
                     }
-                    TransactionId=long.Parse(tempSep[0]);
-                    trancationEstablished=true;
+                    TransactionId = long.Parse(tempSep[0]);
+                    trancationEstablished = true;
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Console.WriteLine(ex.Message);
                 }
@@ -123,21 +164,80 @@ namespace PADI_LIBRARY
             }
         }
 
+        /// <summary>
+        /// Dumps the status of worker serers to their consoles.
+        /// </summary>
+        /// <returns></returns>
         public bool Status()
         {
             master.DumpObjectServerStatus();
             return true;
         }
 
+        /// <summary>
+        /// Call the coordinator to proceed with transaction commit
+        /// </summary>
+        /// <returns></returns>
         public bool TxCommit()
         {
-            bool isCommited = false;
-            //TODO:Call coordinator. To proceed the commit. For testing only hardcoded the below.
-            int[] uidArray = padIntUids.ToArray();
-            isCommited = coordinator.Commit(TransactionId, uidArray);
-           // isCommited=workers[0].DoCommit(TransactionId);
-            return isCommited;
+            lock (this)
+            {
+                bool isCommited = false;
+                int[] uidArray = padIntUids.ToArray();
+                isCommited = coordinator.Commit(TransactionId, uidArray);
+                return isCommited;
+            }
         }
+
+        /// <summary>
+        /// Call coordinator to abort the transaction
+        /// </summary>
+        /// <returns></returns>
+        public bool TxAbort()
+        {
+            //TODO: abort the transaction. Call coordinator's abort method. The implementation is similar to commit.
+            return true;
+        }
+
+        /// <summary>
+        /// This method makes the server at the URL stop responding to external calls except for a Recover call
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
+        public bool Fail(string url)
+        {
+            //TODO: this method makes the server at the URL stop responding to external calls except for a Recover call
+            return true;
+        }
+
+        /// <summary>
+        /// This method makes the server at URL stop responding to external calls 
+        /// but it maintains all calls for later reply, as if the communication to that server were
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
+        public bool Freeze(string url)
+        {
+            //TODO: this method makes the server at URL stop responding to external calls but it maintains all calls for later reply, as if the communication to that server were
+            //only delayed.
+            return true;
+        }
+
+        /// <summary>
+        /// This recovers the Fail and Freeze servers.        
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
+        public bool Recover(string url)
+        {
+            //TODO: recover the Freeze and Fail.
+            return true;
+        }
+
+
+        #endregion 
+
+        #region Private Members
 
         private void LoadServerMap()
         {
@@ -156,6 +256,16 @@ namespace PADI_LIBRARY
                 Console.WriteLine("Loaded the new map, size=" + info.ObjectServerMap.Count());
             }
         }
+
+        private void UpdatePadIntTrack(int uid)
+        {
+            if (!padIntUids.Contains(uid))
+            {
+                padIntUids.Add(uid);
+            }
+        }
+
+        #endregion
     }
 
     [Serializable]

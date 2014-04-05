@@ -1,13 +1,17 @@
-﻿using System;
+﻿#region Directive Section
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+
+#endregion
 
 namespace PADI_LIBRARY
 {
     class CommitRequestStatus
     {
+        #region Initialization
         private ObjectServer server;
 
         public ObjectServer Server
@@ -32,5 +36,14 @@ namespace PADI_LIBRARY
             set { hasCommited = value; }
         }
 
+        private bool hasAborted;
+
+        public bool HasAborted
+        {
+            get { return hasAborted; }
+            set { hasAborted = value; }
+        }
+
+        #endregion
     }
 }

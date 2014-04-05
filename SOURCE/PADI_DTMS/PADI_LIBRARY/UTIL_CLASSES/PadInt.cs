@@ -1,12 +1,18 @@
-﻿using System;
+﻿#region Directive Section
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+
+#endregion
 
 namespace PADI_LIBRARY
 {
     public class PadInt
     {
+        #region Initialization
+
         int uID;
 
         public int UID
@@ -14,15 +20,16 @@ namespace PADI_LIBRARY
             get { return uID; }
             set { uID = value; }
         }
-        
-        ServerPadInt svrPadInt;
-        PADI_Client client;
 
-        public ServerPadInt SvrPadInt
+        PADI_Worker worker;
+
+        public PADI_Worker Worker
         {
-            get { return svrPadInt; }
-            set { svrPadInt = value; }
+            get { return worker; }
+            set { worker = value; }
         }
+
+        PADI_Client client;
 
         public PadInt(int uID, PADI_Client client)
         {
@@ -30,15 +37,46 @@ namespace PADI_LIBRARY
             this.client = client;
         }
 
+        #endregion
+
+        #region Public Members
+
+        /// <summary>
+        /// Read from the object server, value of the ServerPadInt.
+        /// </summary>
+        /// <returns></returns>
         public int Read()
-        {            
-            return svrPadInt.Read(client.TransactionId);
-        }
-
-        public void Write(int value)
         {
-            svrPadInt.Write(client.TransactionId, value);
+            int value;
+            try
+            {
+                value= worker.Read(this.UID, client.TransactionId);
+            }
+            catch (TxException ex)
+            {
+                Common.Logger().LogError(ex.Message,ex.StackTrace,ex.Source);
+                throw ex;
+            }
+            return value;
         }
 
+        /// <summary>
+        /// Write the value to the ServerPadInt in the object server
+        /// </summary>
+        /// <param name="value"></param>
+        public void  Write(int value)
+        {
+            try
+            {
+                worker.Write(this.UID, client.TransactionId, value);
+            }
+            catch (TxException ex)
+            {
+                Common.Logger().LogError(ex.Message, ex.StackTrace, ex.Source);
+                throw ex;
+            }
+        }
+
+        #endregion
     }
 }
