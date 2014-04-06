@@ -137,7 +137,7 @@ namespace PADI_LIBRARY
         /// Set the TID from coordinator and load server map if the available map is expired
         /// </summary>
         /// <returns></returns>
-        public bool BeginTxn()
+        public bool TxBegin()
         {
             lock (this)
             {

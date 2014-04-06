@@ -35,7 +35,7 @@ namespace TestClient1
         {
             try
             {
-                client.BeginTxn();
+                client.TxBegin();
                 PadInt padInt = client.AccessPadInt(1);
                 padInt.Write(102);
                 padInt.Read();
@@ -61,7 +61,7 @@ namespace TestClient1
         {
             try
             {
-                client.BeginTxn();
+                client.TxBegin();
                 PadInt padInt = client.AccessPadInt(1);
                 padInt.Write(103);
                 padInt = client.AccessPadInt(2);

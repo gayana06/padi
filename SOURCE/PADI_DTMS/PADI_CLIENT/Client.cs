@@ -10,6 +10,23 @@ namespace PADI_CLIENT
 {
     class Client
     {
+
+        private  const string APP_SET_TASK = "TASK";
+        private const string BEGIN_TRANSACTION = "BT";
+        private const string END_TRANSACTION = "ET";
+        private const string CREATE_PADINT = "CPI";
+        private const string ACCESS_PADINT = "API";
+        private const string READ = "RD";
+        private const string WRITE = "WT";
+        private const string STATUS_DUMP = "STD";
+        private const char SEP_CHAR_COMMA = ',';
+        private const string SEP_STR_COMMA = ",";
+        private const char SEP_CHAR_COLON = ':';
+        private const string SEP_STR_COLON = ":";
+
+        private string[] operationArray;
+
+
         PADI_Client client;
         public Client()
         {
@@ -21,30 +38,66 @@ namespace PADI_CLIENT
         {
             try
             {
-                client.BeginTxn();
-                PadInt padInt = client.CreatePadInt(1);
-                padInt.Write(10);
-                padInt = client.CreatePadInt(2);
-                padInt.Write(20);
-                padInt = client.CreatePadInt(3);
-                padInt.Write(30);
-                client.TxCommit();
-                Thread.Sleep(2000);
-                Transaction1();
-                Console.ReadLine();
-                client.Status();
+                operationArray = ConfigurationManager.AppSettings[APP_SET_TASK].Split(SEP_CHAR_COMMA);
+                string[] tmp;
+                PadInt padInt=null;
+                foreach (var operation in operationArray)
+                {
+                    tmp = operation.Split(SEP_CHAR_COLON);
+                    switch (tmp[0])
+                    {
+                        case BEGIN_TRANSACTION:
+                            client.TxBegin();
+                            Console.WriteLine("Transaction started");
+                            break;
+                        case END_TRANSACTION:
+                            client.TxCommit();
+                            Console.WriteLine("Transaction committed");
+                            break;
+                        case CREATE_PADINT:
+                            padInt = client.CreatePadInt(Int32.Parse(tmp[1]));
+                            break;
+                        case ACCESS_PADINT:
+                            padInt = client.AccessPadInt(Int32.Parse(tmp[1]));
+                            break;
+                        case READ:
+                            if (padInt != null)
+                                Console.WriteLine("Read value = "+padInt.Read());
+                            else
+                                Console.WriteLine("PadInt is null - READ");
+                            break;
+                        case WRITE:
+                            if (padInt != null)
+                            {
+                                padInt.Write(Int32.Parse(tmp[1]));
+                                Console.WriteLine("Write issued = " + tmp[1]);
+                            }
+                            else
+                                Console.WriteLine("PadInt is null - WRITE");
+                            break;
+                        case STATUS_DUMP:
+                            client.Status();
+                            Console.WriteLine("Dumped Status");
+                            break;
+                    }
+                }
+            }
+            catch (TxException ex)
+            {
+                Console.WriteLine(ex.Message);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
             }
+
         }
 
         public void Transaction1()
         {
             try
             {
-                client.BeginTxn();
+                client.TxBegin();
                 PadInt padInt = client.AccessPadInt(1);                
                 padInt.Write(101);
                 padInt = client.AccessPadInt(2);

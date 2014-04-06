@@ -47,8 +47,9 @@ namespace PADI_LIBRARY
                 }
                 else
                 {
-                    //TODO: After everyone commits update the replicas
+                    TransactionDoCommit(tid);
                     finished = CheckHasCommitted(tid);
+                    //TODO: After everyone commits update the replicas
                     if (finished)
                     {
                         transactionIdDict.Remove(tid);
@@ -83,9 +84,12 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public string BeginTxn()
         {
-            string txnReply = GetTransactionId().ToString() + Constants.SEP_COLON + master.LatestWorkerServerViewTimeStamp.ToString();
-            Common.Logger().LogInfo("Transaction Begun : " + txnReply, string.Empty, string.Empty);
-            return txnReply;
+            lock (this)
+            {
+                string txnReply = GetTransactionId().ToString() + Constants.SEP_COLON + master.LatestWorkerServerViewTimeStamp.ToString();
+                Common.Logger().LogInfo("Transaction Begun : " + txnReply, string.Empty, string.Empty);
+                return txnReply;
+            }
         }
 
         /// <summary>
