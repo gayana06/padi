@@ -165,7 +165,8 @@ namespace PADI_LIBRARY
         }
         
         /// <summary>
-        /// Check posibility of commit for the requests of Coordiator
+        /// Check posibility of commit for the requests of Coordiator.
+        /// If no UID related to TID is not in tentative this return true.
         /// </summary>
         /// <param name="TID"></param>
         /// <returns></returns>
@@ -175,20 +176,28 @@ namespace PADI_LIBRARY
             {
                 bool canCommit = false;
                 List<int> uidsToCommit = GetUidsRelatedToTid(TID);
-                foreach (var uid in uidsToCommit)
+                if (uidsToCommit.Count() > 0)
                 {
-                    canCommit = padIntActiveList[uid].CanCommit(TID);
-                    if (!canCommit)
+                    foreach (var uid in uidsToCommit)
                     {
-                        break;
+                        canCommit = padIntActiveList[uid].CanCommit(TID);
+                        if (!canCommit)
+                        {
+                            break;
+                        }
                     }
+                }
+                else
+                {
+                    canCommit = true;
                 }
                 return canCommit;
             }
         }
 
         /// <summary>
-        /// Enforce the commits for the requests of Coordinator
+        /// Enforce the commits for the requests of Coordinator.
+        /// Return true even if nothing available to commit.
         /// </summary>
         /// <param name="TID"></param>
         /// <returns></returns>
@@ -198,13 +207,20 @@ namespace PADI_LIBRARY
             {
                 bool isCommited = false;
                 List<int> uidsToCommit = GetUidsRelatedToTid(TID);
-                foreach (var uid in uidsToCommit)
+                if (uidsToCommit.Count() > 0)
                 {
-                    isCommited = padIntActiveList[uid].Commit(TID);
-                    if (!isCommited)
+                    foreach (var uid in uidsToCommit)
                     {
-                        break;
+                        isCommited = padIntActiveList[uid].Commit(TID);
+                        if (!isCommited)
+                        {
+                            break;
+                        }
                     }
+                }
+                else
+                {
+                    return true;
                 }
 
                 //TODO: abort the previously completed commits if any

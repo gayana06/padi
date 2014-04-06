@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 
 using PADI_LIBRARY;
+using System.Windows.Forms;
 
 namespace PADI_CLIENT
 {
@@ -12,8 +13,9 @@ namespace PADI_CLIENT
         static void Main(string[] args)
         {
             Common.Logger().LogInfo("Client started",string.Empty,string.Empty);
-            Client client = new Client();
-            client.Start();
+            ClientForm f = new ClientForm();
+            Application.Run(f);
+            
         }
     }
 }

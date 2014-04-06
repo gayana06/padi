@@ -142,6 +142,8 @@ namespace PADI_LIBRARY
             lock (this)
             {
                 bool trancationEstablished = false;
+                //Clear padIntUids. This is only required if multiple transactions are checked in a single machine.
+                padIntUids.Clear();
                 try
                 {
                     string tidReply = coordinator.BeginTxn();

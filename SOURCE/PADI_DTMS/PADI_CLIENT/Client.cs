@@ -12,6 +12,7 @@ namespace PADI_CLIENT
     {
 
         private  const string APP_SET_TASK = "TASK";
+        private const string APP_SET_SLEEP_TIME = "SLEEP_TIME";
         private const string BEGIN_TRANSACTION = "BT";
         private const string END_TRANSACTION = "ET";
         private const string CREATE_PADINT = "CPI";
@@ -23,6 +24,7 @@ namespace PADI_CLIENT
         private const string SEP_STR_COMMA = ",";
         private const char SEP_CHAR_COLON = ':';
         private const string SEP_STR_COLON = ":";
+        
 
         private string[] operationArray;
 
@@ -38,21 +40,27 @@ namespace PADI_CLIENT
         {
             try
             {
+                for (int i = 0; i < Int32.Parse(ConfigurationManager.AppSettings[APP_SET_SLEEP_TIME]); i++)
+                {
+                    Console.WriteLine("starts : "+(10-i));
+                    Thread.Sleep(1000);
+                }
                 operationArray = ConfigurationManager.AppSettings[APP_SET_TASK].Split(SEP_CHAR_COMMA);
                 string[] tmp;
                 PadInt padInt=null;
                 foreach (var operation in operationArray)
                 {
                     tmp = operation.Split(SEP_CHAR_COLON);
+                    bool status = false;
                     switch (tmp[0])
                     {
                         case BEGIN_TRANSACTION:
-                            client.TxBegin();
-                            Console.WriteLine("Transaction started");
+                            status = client.TxBegin();
+                            Console.WriteLine("Transaction started. " + status);
                             break;
                         case END_TRANSACTION:
-                            client.TxCommit();
-                            Console.WriteLine("Transaction committed");
+                            status = client.TxCommit();
+                            Console.WriteLine("Transaction committed. " + status);
                             break;
                         case CREATE_PADINT:
                             padInt = client.CreatePadInt(Int32.Parse(tmp[1]));
