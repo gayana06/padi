@@ -98,7 +98,6 @@ namespace PADI_CLIENT
             {
                 Console.WriteLine(ex.Message);
             }
-
         }
 
         public void Transaction1()
@@ -117,10 +116,7 @@ namespace PADI_CLIENT
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
-            }         
+            }
         }
-
-
     }
-
 }

@@ -7,3 +7,6 @@ E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PRO
 E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\PADI_OBJECT_SERVER\obj\Debug\PADI_OBJECT_SERVER.csprojResolveAssemblyReference.cache
 E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\PADI_OBJECT_SERVER\obj\Debug\PADI_OBJECT_SERVER.exe
 E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\PADI_OBJECT_SERVER\obj\Debug\PADI_OBJECT_SERVER.pdb
+C:\Users\Bogdan\Desktop\Dropbox\IST\PADI\repo\padi\SOURCE\PADI_DTMS\PADI_OBJECT_SERVER\bin\Debug\PADI_OBJECT_SERVER.exe.config
+C:\Users\Bogdan\Desktop\Dropbox\IST\PADI\repo\padi\SOURCE\PADI_DTMS\PADI_OBJECT_SERVER\obj\Debug\PADI_OBJECT_SERVER.exe
+C:\Users\Bogdan\Desktop\Dropbox\IST\PADI\repo\padi\SOURCE\PADI_DTMS\PADI_OBJECT_SERVER\obj\Debug\PADI_OBJECT_SERVER.pdb
