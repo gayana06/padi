@@ -42,12 +42,12 @@ namespace PADI_CLIENT
             {
                 for (int i = 0; i < Int32.Parse(ConfigurationManager.AppSettings[APP_SET_SLEEP_TIME]); i++)
                 {
-                    Console.WriteLine("starts : "+(10-i));
+                    Console.WriteLine("starts : " + (10 - i));
                     Thread.Sleep(1000);
                 }
                 operationArray = ConfigurationManager.AppSettings[APP_SET_TASK].Split(SEP_CHAR_COMMA);
                 string[] tmp;
-                PadInt padInt=null;
+                PadInt padInt = null;
                 foreach (var operation in operationArray)
                 {
                     tmp = operation.Split(SEP_CHAR_COLON);
@@ -70,7 +70,7 @@ namespace PADI_CLIENT
                             break;
                         case READ:
                             if (padInt != null)
-                                Console.WriteLine("Read value = "+padInt.Read());
+                                Console.WriteLine("Read value = " + padInt.Read());
                             else
                                 Console.WriteLine("PadInt is null - READ");
                             break;
@@ -89,6 +89,7 @@ namespace PADI_CLIENT
                             break;
                     }
                 }
+
             }
             catch (TxException ex)
             {
@@ -98,6 +99,11 @@ namespace PADI_CLIENT
             {
                 Console.WriteLine(ex.Message);
             }
+            finally
+            {
+                Console.ReadLine();
+            }
+
         }
 
         public void Transaction1()
@@ -116,7 +122,10 @@ namespace PADI_CLIENT
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
-            }
+            }         
         }
+
+
     }
+
 }

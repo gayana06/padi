@@ -1,7 +1,0 @@
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\LABS\LAB3\RemotingSample\Server\bin\Debug\Server.exe
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\LABS\LAB3\RemotingSample\Server\bin\Debug\Server.pdb
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\LABS\LAB3\RemotingSample\Server\bin\Debug\CommonTypes.dll
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\LABS\LAB3\RemotingSample\Server\bin\Debug\CommonTypes.pdb
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\LABS\LAB3\RemotingSample\Server\obj\Debug\Server.csprojResolveAssemblyReference.cache
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\LABS\LAB3\RemotingSample\Server\obj\Debug\Server.exe
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\LABS\LAB3\RemotingSample\Server\obj\Debug\Server.pdb

@@ -10,8 +10,8 @@ using System.Threading;
 
 namespace PADI_LIBRARY
 {
-    
-    public class ServerPadInt: MarshalByRefObject
+
+    public class ServerPadInt : MarshalByRefObject, ICloneable
     {
         #region Initialization
 
@@ -78,6 +78,15 @@ namespace PADI_LIBRARY
         #endregion
 
         #region Public Members
+        
+        /// <summary>
+        /// Clone the ServerPadInt
+        /// </summary>
+        /// <returns></returns>
+        public object Clone()
+        {
+            return this.MemberwiseClone();
+        }
 
         /// <summary>
         /// Do write on the object itself
@@ -94,6 +103,8 @@ namespace PADI_LIBRARY
                 Console.WriteLine("ReadTSList count = " + ReadTSList.Count());
                 Console.WriteLine("WriteTS = " + WriteTS);
                 Console.WriteLine("TID = "+TID);
+                Console.WriteLine("UID = "+this.Uid);
+                Console.WriteLine("Committed Version Value = "+this.Value);
                 if ((ReadTSList.Count() == 0 || TID >= ReadTSList.Max()) && TID > WriteTS)
                 {
                     if (TentativeList.Exists(x => x.WriteTS == TID))
@@ -134,6 +145,8 @@ namespace PADI_LIBRARY
                 int val=-1;
                 Console.WriteLine("TID = "+TID);
                 Console.WriteLine("WriteTS = " + WriteTS);
+                Console.WriteLine("UID = " + this.Uid);
+                Console.WriteLine("Committed Version Value = " + this.Value);
                 while (true)
                 {
                     if (WriteTS > 0 && TID > WriteTS)
@@ -181,8 +194,7 @@ namespace PADI_LIBRARY
         public bool CanCommit(long TID)
         {
             lock (this)
-            {
-                    
+            {                    
                 bool canCommit = false;
                 if (TentativeList.Exists(x => x.WriteTS == TID))
                 {
@@ -190,6 +202,7 @@ namespace PADI_LIBRARY
                     {
                         if (TentativeList.Exists(x => x.WriteTS < TID))
                         {
+                            Console.WriteLine("Waiting at cancommit TID = "+TID+ " ,UID="+this.Uid);
                             Monitor.Wait(this);
                         }
                         else
@@ -218,7 +231,7 @@ namespace PADI_LIBRARY
             lock (this)
             {
                 bool isCommited = false;
-                Console.WriteLine("\n---------------Commit (START, TID=" + TID + ")-------------------");        
+                Console.WriteLine("\n---------------Commit (START, TID=" + TID + " ,UID=" + this.Uid + ")-------------------");        
                 while (true)
                 {
                     if (TentativeList.Exists(x => x.WriteTS == TID))

@@ -1,0 +1,46 @@
+<<<<<<< HEAD
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using PADI_LIBRARY;
+using System.Windows.Forms;
+
+namespace PADI_CLIENT
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Common.Logger().LogInfo("Client started",string.Empty,string.Empty);
+            ClientForm f = new ClientForm();
+            Application.Run(f);
+            
+        }
+    }
+}
+=======
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+using PADI_LIBRARY;
+using System.Windows.Forms;
+
+namespace PADI_CLIENT
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Common.Logger().LogInfo("Client started",string.Empty,string.Empty);
+           // ClientForm f = new ClientForm();
+           // Application.Run(f);
+            Client c = new Client();
+            c.Start();
+        }
+    }
+}
+>>>>>>> 2011b8ea8fbf6dc43c64e93298b3a9d727a09a90

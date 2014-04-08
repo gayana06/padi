@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PADI_MASTER_SERVER", "PADI_MASTER_SERVER\PADI_MASTER_SERVER.csproj", "{13BA1278-1E60-4599-A273-F32D44E978F5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PADI_OBJECT_SERVER", "PADI_OBJECT_SERVER\PADI_OBJECT_SERVER.csproj", "{7438BCD8-5773-4607-9880-0B0F18F1844C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PADI_CLIENT", "PADI_CLIENT\PADI_CLIENT.csproj", "{2E6D9736-D1A6-458E-AEEA-F32392B58B86}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PADI_LIBRARY", "PADI_LIBRARY\PADI_LIBRARY.csproj", "{FB8F1246-CE63-4B68-8EF4-9D63A6EE94CB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestSolution", "TestSolution\TestSolution.csproj", "{7A2B7F0C-9434-4F57-8E2F-A68ABBC61230}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestClient1", "TestClient1\TestClient1.csproj", "{102334E6-B3C1-4B95-B4C1-9BE72CBCF5AB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{13BA1278-1E60-4599-A273-F32D44E978F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{13BA1278-1E60-4599-A273-F32D44E978F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{13BA1278-1E60-4599-A273-F32D44E978F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{13BA1278-1E60-4599-A273-F32D44E978F5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7438BCD8-5773-4607-9880-0B0F18F1844C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7438BCD8-5773-4607-9880-0B0F18F1844C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7438BCD8-5773-4607-9880-0B0F18F1844C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7438BCD8-5773-4607-9880-0B0F18F1844C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E6D9736-D1A6-458E-AEEA-F32392B58B86}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E6D9736-D1A6-458E-AEEA-F32392B58B86}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E6D9736-D1A6-458E-AEEA-F32392B58B86}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E6D9736-D1A6-458E-AEEA-F32392B58B86}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FB8F1246-CE63-4B68-8EF4-9D63A6EE94CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB8F1246-CE63-4B68-8EF4-9D63A6EE94CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB8F1246-CE63-4B68-8EF4-9D63A6EE94CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB8F1246-CE63-4B68-8EF4-9D63A6EE94CB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7A2B7F0C-9434-4F57-8E2F-A68ABBC61230}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A2B7F0C-9434-4F57-8E2F-A68ABBC61230}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A2B7F0C-9434-4F57-8E2F-A68ABBC61230}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A2B7F0C-9434-4F57-8E2F-A68ABBC61230}.Release|Any CPU.Build.0 = Release|Any CPU
+		{102334E6-B3C1-4B95-B4C1-9BE72CBCF5AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{102334E6-B3C1-4B95-B4C1-9BE72CBCF5AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{102334E6-B3C1-4B95-B4C1-9BE72CBCF5AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{102334E6-B3C1-4B95-B4C1-9BE72CBCF5AB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

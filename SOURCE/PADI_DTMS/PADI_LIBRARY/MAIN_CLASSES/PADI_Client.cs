@@ -68,33 +68,31 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public PadInt CreatePadInt(int uid)
         {
-            lock (this)
+            PadInt padInt = null;
+            int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
+            if (modIndex >= 0)
             {
-                PadInt padInt = null;
-                int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
-                if (modIndex >= 0)
+                if (workers[modIndex].CreatePadInt(uid))
                 {
-                    if (workers[modIndex].CreatePadInt(uid))
-                    {
-                        padInt = new PadInt(uid, this);
-                        padInt.Worker = workers[modIndex];
-                        UpdatePadIntTrack(uid);
-                        Console.WriteLine("PadInt successfully created, UID = " + uid);
-                        Common.Logger().LogInfo("PadInt successfully created, UID = " + uid, string.Empty, string.Empty);
-                    }
-                    else
-                    {
-                        Console.WriteLine("CreatePadInt for UID = " + uid + " returned null. Already exists");
-                        Common.Logger().LogInfo("CreatePadInt for UID = " + uid + " returned null. Already exists", string.Empty, string.Empty);
-                    }
+                    padInt = new PadInt(uid, this);
+                    padInt.Worker = workers[modIndex];
+                    UpdatePadIntTrack(uid);
+                    Console.WriteLine("PadInt successfully created, UID = " + uid);
+                    Common.Logger().LogInfo("PadInt successfully created, UID = " + uid, string.Empty, string.Empty);
                 }
                 else
                 {
-                    Console.WriteLine("No worker server found");
-                    Common.Logger().LogInfo("No worker server found", string.Empty, string.Empty);
+                    Console.WriteLine("CreatePadInt for UID = " + uid + " returned null. Already exists");
+                    Common.Logger().LogInfo("CreatePadInt for UID = " + uid + " returned null. Already exists", string.Empty, string.Empty);
                 }
-                return padInt;
             }
+            else
+            {
+                Console.WriteLine("No worker server found");
+                Common.Logger().LogInfo("No worker server found", string.Empty, string.Empty);
+            }
+            return padInt;
+
         }
 
         /// <summary>
@@ -104,33 +102,31 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public PadInt AccessPadInt(int uid)
         {
-            lock (this)
+            int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
+            PadInt padInt = null;
+            if (modIndex >= 0)
             {
-                int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
-                PadInt padInt = null;
-                if (modIndex >= 0)
+                if (workers[modIndex].AccessPadInt(uid))
                 {
-                    if (workers[modIndex].AccessPadInt(uid))
-                    {
-                        padInt = new PadInt(uid, this);
-                        padInt.Worker = workers[modIndex];
-                        UpdatePadIntTrack(uid);
-                        Console.WriteLine("PadInt successfully retrieved, UID = " + uid);
-                        Common.Logger().LogInfo("PadInt successfully retrieved, UID = " + uid, string.Empty, string.Empty);
-                    }
-                    else
-                    {
-                        Console.WriteLine("AccessPadInt for UID = " + uid + " returned null. Not available");
-                        Common.Logger().LogInfo("AccessPadInt for UID = " + uid + " returned null. Not available", string.Empty, string.Empty);
-                    }
+                    padInt = new PadInt(uid, this);
+                    padInt.Worker = workers[modIndex];
+                    UpdatePadIntTrack(uid);
+                    Console.WriteLine("PadInt successfully retrieved, UID = " + uid);
+                    Common.Logger().LogInfo("PadInt successfully retrieved, UID = " + uid, string.Empty, string.Empty);
                 }
                 else
                 {
-                    Console.WriteLine("No worker servers found");
-                    Common.Logger().LogInfo("No worker servers found", string.Empty, string.Empty);
+                    Console.WriteLine("AccessPadInt for UID = " + uid + " returned null. Not available");
+                    Common.Logger().LogInfo("AccessPadInt for UID = " + uid + " returned null. Not available", string.Empty, string.Empty);
                 }
-                return padInt;
             }
+            else
+            {
+                Console.WriteLine("No worker servers found");
+                Common.Logger().LogInfo("No worker servers found", string.Empty, string.Empty);
+            }
+            return padInt;
+
         }
 
         /// <summary>
@@ -139,31 +135,29 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool TxBegin()
         {
-            lock (this)
+            bool trancationEstablished = false;
+            //Clear padIntUids. This is only required if multiple transactions are checked in a single machine.
+            padIntUids.Clear();
+            try
             {
-                bool trancationEstablished = false;
-                //Clear padIntUids. This is only required if multiple transactions are checked in a single machine.
-                padIntUids.Clear();
-                try
+                string tidReply = coordinator.BeginTxn();
+                Console.WriteLine("Coordinator reply : " + tidReply);
+                string[] tempSep = tidReply.Split(Constants.SEP_CHAR_COLON);
+                long receivedTimeStamp = long.Parse(tempSep[1]);
+                if (receivedTimeStamp != info.AvailableMasterMapTimeStamp)
                 {
-                    string tidReply = coordinator.BeginTxn();
-                    Console.WriteLine("Coordinator reply : " + tidReply);
-                    string[] tempSep = tidReply.Split(Constants.SEP_CHAR_COLON);
-                    long receivedTimeStamp = long.Parse(tempSep[1]);
-                    if (receivedTimeStamp != info.AvailableMasterMapTimeStamp)
-                    {
-                        info.AvailableMasterMapTimeStamp = receivedTimeStamp;
-                        LoadServerMap();
-                    }
-                    TransactionId = long.Parse(tempSep[0]);
-                    trancationEstablished = true;
+                    info.AvailableMasterMapTimeStamp = receivedTimeStamp;
+                    LoadServerMap();
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.Message);
-                }
-                return trancationEstablished;
+                TransactionId = long.Parse(tempSep[0]);
+                trancationEstablished = true;
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            return trancationEstablished;
+
         }
 
         /// <summary>
@@ -182,13 +176,11 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool TxCommit()
         {
-            lock (this)
-            {
-                bool isCommited = false;
-                int[] uidArray = padIntUids.ToArray();
-                isCommited = coordinator.Commit(TransactionId, uidArray);
-                return isCommited;
-            }
+            bool isCommited = false;
+            int[] uidArray = padIntUids.ToArray();
+            isCommited = coordinator.Commit(TransactionId, uidArray);
+            return isCommited;
+
         }
 
         /// <summary>
@@ -197,13 +189,11 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool TxAbort()
         {
-            lock (this)
-            {
-                bool isAborted = false;
-                isAborted = coordinator.AbortTxn(TransactionId);
-                return true;
-            }
             //TODO: abort the transaction. Call coordinator's abort method. The implementation is similar to commit.
+            bool isAborted = false;
+            isAborted = coordinator.AbortTxn(TransactionId);
+            return isAborted;
+            
         }
 
         /// <summary>
@@ -248,20 +238,18 @@ namespace PADI_LIBRARY
 
         private void LoadServerMap()
         {
-            lock (this)
+            info.ObjectServerMap = master.WorkerServerList.ToArray();
+            workers.Clear();
+            PADI_Worker worker;
+            foreach (var server in info.ObjectServerMap)
             {
-                info.ObjectServerMap = master.WorkerServerList.ToArray();
-                workers.Clear();
-                PADI_Worker worker;
-                foreach (var server in info.ObjectServerMap)
-                {
-                    string ip = server.ServerIp;
-                    string port = server.ServerPort;
-                    worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(ip, port, Constants.OBJECT_TYPE_PADI_WORKER));
-                    workers.Add(worker);
-                }
-                Console.WriteLine("Loaded the new map, size=" + info.ObjectServerMap.Count());
+                string ip = server.ServerIp;
+                string port = server.ServerPort;
+                worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(ip, port, Constants.OBJECT_TYPE_PADI_WORKER));
+                workers.Add(worker);
             }
+            Console.WriteLine("Loaded the new map, size=" + info.ObjectServerMap.Count());
+
         }
 
         private void UpdatePadIntTrack(int uid)

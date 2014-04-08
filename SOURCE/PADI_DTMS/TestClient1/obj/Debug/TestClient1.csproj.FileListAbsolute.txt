@@ -1,9 +1,0 @@
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestClient1\bin\Debug\TestClient1.exe
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestClient1\bin\Debug\TestClient1.pdb
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestClient1\bin\Debug\PADI_LIBRARY.dll
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestClient1\bin\Debug\log4net.dll
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestClient1\bin\Debug\PADI_LIBRARY.pdb
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestClient1\obj\Debug\TestClient1.exe
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestClient1\obj\Debug\TestClient1.pdb
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestClient1\bin\Debug\TestClient1.exe.config
-E:\EMDC_IST\SEMESTER_2\PADI_Middleware_for_Distributed_Internet_Applications\PROJECT\SOURCE\PADI_DTMS\TestClient1\obj\Debug\TestClient1.csprojResolveAssemblyReference.cache
