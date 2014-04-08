@@ -10,83 +10,117 @@ namespace PADI_CLIENT
 {
     class Client
     {
-        PADI_Coordinator coordinator;
-        PADI_Master master;
-        Information info;
+
+        private  const string APP_SET_TASK = "TASK";
+        private const string APP_SET_SLEEP_TIME = "SLEEP_TIME";
+        private const string BEGIN_TRANSACTION = "BT";
+        private const string END_TRANSACTION = "ET";
+        private const string CREATE_PADINT = "CPI";
+        private const string ACCESS_PADINT = "API";
+        private const string READ = "RD";
+        private const string WRITE = "WT";
+        private const string STATUS_DUMP = "STD";
+        private const char SEP_CHAR_COMMA = ',';
+        private const string SEP_STR_COMMA = ",";
+        private const char SEP_CHAR_COLON = ':';
+        private const string SEP_STR_COLON = ":";
+        
+
+        private string[] operationArray;
+
+
+        PADI_Client client;
         public Client()
         {
-            //TODO:Load the Info object when start and save it when client exit. Currently new object is created.
-            info = new Information();
-            StartClientTransactions();
+            client = new PADI_Client();
+            client.Init();
         }
 
-        public void StartClientTransactions()
+        public void Start()
         {
             try
             {
-                for (int i = 0; i < 100; i++)
+                for (int i = 0; i < Int32.Parse(ConfigurationManager.AppSettings[APP_SET_SLEEP_TIME]); i++)
                 {
-                    long tid = BeginTxn();
-                    Console.WriteLine("Trancation ID received:" + tid);
-                    Thread.Sleep(7000);
+                    Console.WriteLine("starts : "+(10-i));
+                    Thread.Sleep(1000);
                 }
-                
+                operationArray = ConfigurationManager.AppSettings[APP_SET_TASK].Split(SEP_CHAR_COMMA);
+                string[] tmp;
+                PadInt padInt=null;
+                foreach (var operation in operationArray)
+                {
+                    tmp = operation.Split(SEP_CHAR_COLON);
+                    bool status = false;
+                    switch (tmp[0])
+                    {
+                        case BEGIN_TRANSACTION:
+                            status = client.TxBegin();
+                            Console.WriteLine("Transaction started. " + status);
+                            break;
+                        case END_TRANSACTION:
+                            status = client.TxCommit();
+                            Console.WriteLine("Transaction committed. " + status);
+                            break;
+                        case CREATE_PADINT:
+                            padInt = client.CreatePadInt(Int32.Parse(tmp[1]));
+                            break;
+                        case ACCESS_PADINT:
+                            padInt = client.AccessPadInt(Int32.Parse(tmp[1]));
+                            break;
+                        case READ:
+                            if (padInt != null)
+                                Console.WriteLine("Read value = "+padInt.Read());
+                            else
+                                Console.WriteLine("PadInt is null - READ");
+                            break;
+                        case WRITE:
+                            if (padInt != null)
+                            {
+                                padInt.Write(Int32.Parse(tmp[1]));
+                                Console.WriteLine("Write issued = " + tmp[1]);
+                            }
+                            else
+                                Console.WriteLine("PadInt is null - WRITE");
+                            break;
+                        case STATUS_DUMP:
+                            client.Status();
+                            Console.WriteLine("Dumped Status");
+                            break;
+                    }
+                }
+            }
+            catch (TxException ex)
+            {
+                Console.WriteLine(ex.Message);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
             }
+
         }
 
-
-        /// <summary>
-        /// Get the TID from coordinator and load server map if the available map is expired
-        /// </summary>
-        /// <returns></returns>
-        public long BeginTxn()
+        public void Transaction1()
         {
-            coordinator=(PADI_Coordinator)Activator.GetObject(typeof(PADI_Coordinator),Common.GenerateTcpUrl(ConfigurationManager.AppSettings[Constants.APPSET_MASTER_IP],ConfigurationManager.AppSettings[Constants.APPSET_MASTER_PORT],Constants.OBJECT_TYPE_PADI_COORDINATOR));
-            string tidReply = coordinator.BeginTxn();
-            Console.WriteLine("Coordinator reply : "+tidReply);
-            string[] tempSep = tidReply.Split(Constants.SEP_CHAR_COLON);
-            long receivedTimeStamp =long.Parse(tempSep[1]);
-            if (receivedTimeStamp != info.AvailableMasterMapTimeStamp)
+            try
             {
-                info.AvailableMasterMapTimeStamp = receivedTimeStamp;
-                LoadServerMap();
+                client.TxBegin();
+                PadInt padInt = client.AccessPadInt(1);                
+                padInt.Write(101);
+                padInt = client.AccessPadInt(2);
+                padInt.Write(201);
+                padInt = client.AccessPadInt(3);
+                padInt.Write(301);
+                client.TxCommit();                
             }
-            return long.Parse(tempSep[0]);
-        }
-
-        public void LoadServerMap()
-        {            
-            master = (PADI_Master)Activator.GetObject(typeof(PADI_Master), Common.GetMasterTcpUrl());
-            info.ObjectServerMap = master.WorkerServerList.ToArray();
-            Console.WriteLine("Loaded the new map, size="+info.ObjectServerMap.Count());
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }         
         }
 
 
     }
 
-    [Serializable]
-    class Information
-    {
-        private long availableMasterMapTimeStamp;
-
-        public long AvailableMasterMapTimeStamp
-        {
-            get { return availableMasterMapTimeStamp; }
-            set { availableMasterMapTimeStamp = value; }
-        }
-
-        private ObjectServer[] objectServerMap;
-
-        public ObjectServer[] ObjectServerMap
-        {
-            get { return objectServerMap; }
-            set { objectServerMap = value; }
-        }
-
-
-    }
 }

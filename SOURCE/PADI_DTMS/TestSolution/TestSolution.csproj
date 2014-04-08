@@ -43,6 +43,12 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PADI_LIBRARY\PADI_LIBRARY.csproj">
+      <Project>{fb8f1246-ce63-4b68-8ef4-9d63a6ee94cb}</Project>
+      <Name>PADI_LIBRARY</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

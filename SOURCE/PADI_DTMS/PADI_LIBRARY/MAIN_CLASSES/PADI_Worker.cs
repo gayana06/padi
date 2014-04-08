@@ -1,35 +1,65 @@
-﻿using System;
+﻿#region Directive Section
+
+using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Text;
-using PADI_LIBRARY.UTIL_CLASSES;
+
+#endregion
 
 namespace PADI_LIBRARY
 {
     public class PADI_Worker : MarshalByRefObject
     {
+        #region Initialization
+
+        ObjectServer thisServer;
         private ObjectServer[] objectServerList;
 
-        PadInt padint;
-        PadInt tentativePadint;
-
-        private List<PadInt> storedObjects = new List<PadInt>();
-        private List<PadInt> tentativeVersions = new List<PadInt>();
-
-        DateTime timestamp;
-        DateTime rts; // Read timestamp
-        DateTime wts; // write timestamp
-        DateTime cts; // current timestamp
-
-        Dictionary<int, List<DateTime>> readDic = new Dictionary<int, List<DateTime>>();
-        Dictionary<int, List<DateTime>> writeDic = new Dictionary<int, List<DateTime>>();
-
-        Dictionary<int, List<DateTime>> tentativeReads = new Dictionary<int, List<DateTime>>();
-        Dictionary<int, List<DateTime>> tentativeWrites = new Dictionary<int, List<DateTime>>();
+        private Dictionary<int,ServerPadInt> padIntActiveList;
         
-        private static long lastTime;
-        private static object timeLock = new object();
-        private static object createLock = new object();
+        public PADI_Worker()
+        {
+            padIntActiveList = new Dictionary<int,ServerPadInt>();
+           
+        }
+
+        #endregion
+
+        #region Public Members
+
+        /// <summary>
+        /// Bootstarp object servers with the master
+        /// </summary>
+        /// <param name="workerPort"></param>
+        /// <returns></returns>
+        public bool BootstrapMaster(string workerPort)
+        {
+            bool isBootstraped = false;
+            String masterUrl = Common.GetMasterTcpUrl();
+            //String workerIp = Common.GetLocalIPAddress();
+            String workerIp = ConfigurationManager.AppSettings[Constants.APPSET_WORKER_IP];
+            PADI_Master masterObj = (PADI_Master)Activator.GetObject(typeof(PADI_Master), masterUrl);
+            thisServer = masterObj.Bootstrap(workerIp, workerPort);
+            if (thisServer != null)
+            {
+                isBootstraped = true;
+            }
+            Console.WriteLine("Worker server :" + thisServer.ServerName + "started. Bootstrap status:" + isBootstraped);
+            Common.Logger().LogInfo("Worker server :" + thisServer.ServerName + " started", "Port : " + workerPort, "Bootstrap status:" + isBootstraped);
+            return isBootstraped;
+        }
+
+        /// <summary>
+        /// Send periodic heart beats to the master
+        /// </summary>
+        /// <param name="state"></param>
+        public void SendHeartBeatMessage(object state)
+        {
+            PADI_Master master = (PADI_Master)Activator.GetObject(typeof(PADI_Master), Common.GetMasterTcpUrl());
+            master.HeartBeatReceiver(thisServer.ServerName);
+        }
 
         /// <summary>
         /// This make the lease to expire never.
@@ -40,6 +70,10 @@ namespace PADI_LIBRARY
             return null;
         }
 
+        /// <summary>
+        /// Receive the new object server map from server when object server join or left
+        /// </summary>
+        /// <param name="objectServerList"></param>
         public void ReceiveObjectServerList(ObjectServer[] objectServerList)
         {
             this.objectServerList=objectServerList;
@@ -48,145 +82,229 @@ namespace PADI_LIBRARY
         }
 
         /// <summary>
-        /// Creates a new shared object with the given uid
+        /// Read the value from the UID within the transaction TID
         /// </summary>
-        /// <returns>false or true</returns>
-        public bool CreatePadInt(int uid, int value)
+        /// <param name="uid"></param>
+        /// <param name="TID"></param>
+        /// <returns></returns>
+        public int Read(int uid,long TID) 
         {
-            lock (createLock) //prevent the same object to be created at the same time
+            lock (this)
             {
-                if (storedObjects.Exists(x => x.Uid == uid))
-                    return false;
-                else
+                try
                 {
-                    timestamp = GetCurrentTime();
-                    padint = new PadInt();
-                    padint.Uid = uid;
-                    padint.Value = value;
-                    padint.Timestamp = timestamp;
-
-                    storedObjects.Add(padint);
-                   // allObjects.Add(String.Format("{0}: {1}", uid, value));
-                    return true;
+                    return padIntActiveList[uid].Read(TID);
+                }
+                catch (Exception ex)
+                {
+                    throw new TxException(ex.Message,ex);
                 }
             }
 
-            //TO DO - Handle replication 
         }
 
         /// <summary>
-        /// Returns a reference to the shared object
+        /// Write the value to the UID within the transaction TID
+        /// </summary>
         /// <param name="uid"></param>
-        /// </summary>
-        /// <returns>value or 0</returns>
-        public PadInt AccessPadInt(int uid)
+        /// <param name="TID"></param>
+        /// <param name="value"></param>
+        public void Write(int uid, long TID, int value)
         {
-            if (storedObjects.Exists(x => x.Uid == uid))
-                return storedObjects.Find(x => x.Uid == uid);
-            else
-                return null;
-        }
-
-        /// this should be moved to the coordinator or the master 
-        /// <summary>
-        /// Generates a unique timestamps for each transaction
-        /// </summary>
-        /// <returns>unique timestamp value</returns>
-        public DateTime GetCurrentTime()
-        {
-            lock (timeLock) // prevent concurrent access to ensure uniqueness
+            lock (this)
             {
-                DateTime result = DateTime.UtcNow;
-                if (result.Ticks <= lastTime)
-                    result = new DateTime(lastTime + 1);
-                lastTime = result.Ticks;
-                return result;
+                bool isWriteSuccessful=padIntActiveList[uid].Write(TID, value);
+                if (!isWriteSuccessful)
+                {
+                    //TODO: Ask coordinator to abort the transaction TID
+                    throw new TxException("Write aborted TID=" + TID);
+                }
+
             }
         }
 
         /// <summary>
-        /// Handles the read operations
+        /// Create a ServerPadInt for the requests of clients
         /// </summary>
         /// <param name="uid"></param>
         /// <returns></returns>
-        public bool Read(int uid)
+        public bool CreatePadInt(int uid)
         {
-            PadInt original = AccessPadInt(uid);
-            if (original != null)
+            lock (this)
             {
-                cts = GetCurrentTime();
-
-                if (writeDic.ContainsKey(uid))
+                bool isCreated = false;
+                ServerPadInt newPadInt = null;
+                if (!padIntActiveList.ContainsKey(uid))
                 {
-                    wts = writeDic[uid].Max(); //Get the latest write of the committed object
-                    if (wts > cts)
-                        return false; //abort this transaction, a write with a greater timestamp has taken place
-                    else
-                    {
-                        tentativeReads[uid].Add(cts); //record the tentative value
-                        return true; //allow this transaction to continue
-                    }
+                    newPadInt = new ServerPadInt(uid, this);
+                    padIntActiveList.Add(uid, newPadInt);
+                    isCreated = true;
                 }
-                else if (readDic.ContainsKey(uid) && !writeDic.ContainsKey(uid))
-                {
-                    tentativeReads[uid].Add(cts);
-                    return true; //transaction continues as long as the no write has taken place
-                }
-                else
-                {
-                    //this happens only during the object creation when no read or write has taken place
-                    tentativeReads[uid].Add(cts);
-                    return true;
-                }
+                return isCreated;
             }
-            else
-                return false; //object not found
         }
 
         /// <summary>
-        /// Handles a write operation
+        /// Inform the availability of the requested ServerPdInt in the server
         /// </summary>
         /// <param name="uid"></param>
         /// <returns></returns>
-        public bool Write(int uid)
+        public bool AccessPadInt(int uid)
         {
-            PadInt original = AccessPadInt(uid);
-            if (original != null)
+            lock (this)
             {
-                cts = GetCurrentTime();
-
-                if (writeDic.ContainsKey(uid))
+                bool isAccessed = false;
+                ServerPadInt padInt = null;
+                if (padIntActiveList.ContainsKey(uid))
                 {
-                    wts = writeDic[uid].Max(); //latest write
-                    if (wts > cts)
-                        return false; //a write with larger timestamp has taken place
-                    else
+                    padInt = padIntActiveList[uid];
+                    isAccessed = true;
+                }
+                return isAccessed;
+            }
+        }
+        
+        /// <summary>
+        /// Check posibility of commit for the requests of Coordiator.
+        /// If no UID related to TID is not in tentative this return true.
+        /// </summary>
+        /// <param name="TID"></param>
+        /// <returns></returns>
+        public bool CanCommit(long TID)
+        {
+            lock (this)
+            {
+                bool canCommit = false;
+                List<int> uidsToCommit = GetUidsRelatedToTid(TID);
+                if (uidsToCommit.Count() > 0)
+                {
+                    foreach (var uid in uidsToCommit)
                     {
-                        if (readDic.ContainsKey(uid))
+                        canCommit = padIntActiveList[uid].CanCommit(TID);
+                        if (!canCommit)
                         {
-                            rts = readDic[uid].Max();
-                            if (cts >= rts)
-                            {
-                                tentativeWrites[uid].Add(cts);
-                                return true; //a read with a larger timestamp has taken place
-                            }
-                            else
-                                return false;//a read with a larger timesatamp has taken place
+                            break;
                         }
-                        else
-                            return true;
                     }
                 }
                 else
                 {
-                    //this happens only during the object creation when no read or write has taken place
-                    tentativeWrites[uid].Add(cts);
-                    return true;
+                    canCommit = true;
                 }
+                return canCommit;
             }
-            else
-                return false; //object not found
         }
 
+        /// <summary>
+        /// Enforce the commits for the requests of Coordinator.
+        /// Return true even if nothing available to commit.
+        /// </summary>
+        /// <param name="TID"></param>
+        /// <returns></returns>
+        public bool DoCommit(long TID)
+        {
+            lock (this)
+            {
+                bool isCommited = false;
+                List<int> uidsToCommit = GetUidsRelatedToTid(TID);
+                if (uidsToCommit.Count() > 0)
+                {
+                    foreach (var uid in uidsToCommit)
+                    {
+                        isCommited = padIntActiveList[uid].Commit(TID);
+                        if (!isCommited)
+                        {
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    return true;
+                }
+
+                //TODO: abort the previously completed commits if any
+                return isCommited;
+            }
+        }
+
+        /// <summary>
+        /// Call TxAbort for each of the tentative objects.
+        /// Return true even if nothing available to abort.
+        /// </summary>
+        /// <param name="TID"></param>
+        /// <returns></returns>
+        public bool Abort(long TID)
+        {
+            lock (this)
+            {
+                bool isAborted = false;
+                List<int> uidsToAbort = GetUidsRelatedToTid(TID);
+                if (uidsToAbort.Count() > 0)
+                {
+                    foreach (var uid in uidsToAbort)
+                    {
+                        isAborted = padIntActiveList[uid].TxAbort(TID);
+                        if (!isAborted)
+                        {
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    return true;
+                }
+
+                return isAborted;
+            }
+
+        }
+
+        /// <summary>
+        /// Force to dump the server current status to console
+        /// </summary>
+        public void DumpStatus()
+        {
+            lock (this)
+            {
+                Console.WriteLine("\n---------------------Server Status (Start)------------------------");
+                foreach (var val in padIntActiveList)
+                {
+                    Console.WriteLine("Uid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited);
+                    foreach (var tentative in val.Value.TentativeList)
+                    {
+                        Console.WriteLine("Tentative TID = " + tentative.WriteTS + " Value = " + tentative.Value);
+                    }
+                    Console.WriteLine("\n");
+                }
+                Console.WriteLine("---------------------Server Status (END)------------------------\n");
+            }
+        }
+
+        #endregion
+
+        #region Private Members
+
+        /// <summary>
+        /// Get UIDs related to a transaction id. 
+        /// </summary>
+        /// <param name="TID"></param>
+        /// <returns></returns>
+        private List<int> GetUidsRelatedToTid(long TID)
+        {
+            lock (this)
+            {
+                List<int> uids = new List<int>();
+                foreach (var item in padIntActiveList)
+                {
+                    if (item.Value.TentativeList.Exists(x => x.WriteTS == TID))
+                        uids.Add(item.Key);
+                }
+                return uids;
+            }
+        }
+
+        #endregion
     }
 }

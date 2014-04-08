@@ -1,45 +1,82 @@
-﻿using System;
+﻿#region Directive Section
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace PADI_LIBRARY.UTIL_CLASSES
+#endregion
+
+namespace PADI_LIBRARY
 {
-    [Serializable]
     public class PadInt
     {
-        private int uid;
+        #region Initialization
 
-        public int Uid
+        int uID;
+
+        public int UID
         {
-            get { return uid; }
-            set { uid = value; }
+            get { return uID; }
+            set { uID = value; }
         }
 
-        private int value;
+        PADI_Worker worker;
 
-        public int Value
+        public PADI_Worker Worker
         {
-            get { return this.value; }
-            set { this.value = value; }
+            get { return worker; }
+            set { worker = value; }
         }
 
-        private DateTime timestamp;
+        PADI_Client client;
 
-        public DateTime Timestamp
+        public PadInt(int uID, PADI_Client client)
         {
-            get { return this.timestamp; }
-            set { this.timestamp = value; }
+            this.UID = uID;
+            this.client = client;
         }
 
-        public PadInt(int uid, int value)
+        #endregion
+
+        #region Public Members
+
+        /// <summary>
+        /// Read from the object server, value of the ServerPadInt.
+        /// </summary>
+        /// <returns></returns>
+        public int Read()
         {
-            this.uid = uid;
-            this.value = value;
+            int value;
+            try
+            {
+                value= worker.Read(this.UID, client.TransactionId);
+            }
+            catch (TxException ex)
+            {
+                Common.Logger().LogError(ex.Message,ex.StackTrace,ex.Source);
+                throw ex;
+            }
+            return value;
         }
 
-        public PadInt()
-        { }
+        /// <summary>
+        /// Write the value to the ServerPadInt in the object server
+        /// </summary>
+        /// <param name="value"></param>
+        public void  Write(int value)
+        {
+            try
+            {
+                worker.Write(this.UID, client.TransactionId, value);
+            }
+            catch (TxException ex)
+            {
+                Common.Logger().LogError(ex.Message, ex.StackTrace, ex.Source);
+                throw ex;
+            }
+        }
 
+        #endregion
     }
 }
