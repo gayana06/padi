@@ -87,20 +87,16 @@ namespace PADI_LIBRARY
         /// <param name="uid"></param>
         /// <param name="TID"></param>
         /// <returns></returns>
-        public int Read(int uid,long TID) 
+        public int Read(int uid, long TID)
         {
-            lock (this)
+            try
             {
-                try
-                {
-                    return padIntActiveList[uid].Read(TID);
-                }
-                catch (Exception ex)
-                {
-                    throw new TxException(ex.Message,ex);
-                }
+                return padIntActiveList[uid].Read(TID);
             }
-
+            catch (Exception ex)
+            {
+                throw new TxException(ex.Message, ex);
+            }
         }
 
         /// <summary>
@@ -111,15 +107,12 @@ namespace PADI_LIBRARY
         /// <param name="value"></param>
         public void Write(int uid, long TID, int value)
         {
-            lock (this)
+            bool isWriteSuccessful = padIntActiveList[uid].Write(TID, value);
+            if (!isWriteSuccessful)
             {
-                bool isWriteSuccessful=padIntActiveList[uid].Write(TID, value);
-                if (!isWriteSuccessful)
-                {
-                    //TODO: Ask coordinator to abort the transaction TID
-                    throw new TxException("Write aborted TID=" + TID);
-                }
-
+                //TODO: Ask coordinator to abort the transaction TID
+                Console.WriteLine("Write aborted TID=" + TID);
+                throw new TxException("Write aborted TID=" + TID);
             }
         }
 
@@ -151,17 +144,15 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool AccessPadInt(int uid)
         {
-            lock (this)
+            bool isAccessed = false;
+            ServerPadInt padInt = null;
+            if (padIntActiveList.ContainsKey(uid))
             {
-                bool isAccessed = false;
-                ServerPadInt padInt = null;
-                if (padIntActiveList.ContainsKey(uid))
-                {
-                    padInt = padIntActiveList[uid];
-                    isAccessed = true;
-                }
-                return isAccessed;
+                padInt = padIntActiveList[uid];
+                isAccessed = true;
             }
+            return isAccessed;
+
         }
         
         /// <summary>
@@ -172,27 +163,25 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool CanCommit(long TID)
         {
-            lock (this)
+            bool canCommit = false;
+            List<int> uidsToCommit = GetUidsRelatedToTid(TID);
+            if (uidsToCommit.Count() > 0)
             {
-                bool canCommit = false;
-                List<int> uidsToCommit = GetUidsRelatedToTid(TID);
-                if (uidsToCommit.Count() > 0)
+                foreach (var uid in uidsToCommit)
                 {
-                    foreach (var uid in uidsToCommit)
+                    canCommit = padIntActiveList[uid].CanCommit(TID);
+                    if (!canCommit)
                     {
-                        canCommit = padIntActiveList[uid].CanCommit(TID);
-                        if (!canCommit)
-                        {
-                            break;
-                        }
+                        break;
                     }
                 }
-                else
-                {
-                    canCommit = true;
-                }
-                return canCommit;
             }
+            else
+            {
+                canCommit = true;
+            }
+            return canCommit;
+
         }
 
         /// <summary>
@@ -203,29 +192,47 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool DoCommit(long TID)
         {
-            lock (this)
+            bool isCommited = false;
+            List<int> uidsToCommit = GetUidsRelatedToTid(TID);
+            if (uidsToCommit.Count() > 0)
             {
-                bool isCommited = false;
-                List<int> uidsToCommit = GetUidsRelatedToTid(TID);
-                if (uidsToCommit.Count() > 0)
+                foreach (var uid in uidsToCommit)
                 {
-                    foreach (var uid in uidsToCommit)
+                    isCommited = padIntActiveList[uid].Commit(TID);
+                    if (!isCommited)
                     {
-                        isCommited = padIntActiveList[uid].Commit(TID);
-                        if (!isCommited)
-                        {
-                            break;
-                        }
+                        break;
                     }
                 }
-                else
-                {
-                    return true;
-                }
-
-                //TODO: abort the previously completed commits if any
-                return isCommited;
             }
+            else
+            {
+                return true;
+            }
+
+            //TODO: abort the previously completed commits if any
+            return isCommited;
+
+        }
+
+        /// <summary>
+        /// Force to dump the server current status to console
+        /// </summary>
+        public void DumpStatus()
+        {
+            Console.WriteLine("\n---------------------Server Status (Start)------------------------");
+            Dictionary<int, ServerPadInt> tempPadIntActiveList = new Dictionary<int, ServerPadInt>(padIntActiveList);
+            foreach (var val in tempPadIntActiveList)
+            {
+                Console.WriteLine("Uid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited);
+                foreach (var tentative in val.Value.TentativeList)
+                {
+                    Console.WriteLine("Tentative TID = " + tentative.WriteTS + " Value = " + tentative.Value);
+                }
+                Console.WriteLine("\n");
+            }
+            Console.WriteLine("---------------------Server Status (END)------------------------\n");
+
         }
 
         /// <summary>
@@ -236,50 +243,25 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool Abort(long TID)
         {
-            lock (this)
+            bool isAborted = false;
+            List<int> uidsToAbort = GetUidsRelatedToTid(TID);
+            if (uidsToAbort.Count() > 0)
             {
-                bool isAborted = false;
-                List<int> uidsToAbort = GetUidsRelatedToTid(TID);
-                if (uidsToAbort.Count() > 0)
+                foreach (var uid in uidsToAbort)
                 {
-                    foreach (var uid in uidsToAbort)
+                    isAborted = padIntActiveList[uid].TxAbort(TID);
+                    if (!isAborted)
                     {
-                        isAborted = padIntActiveList[uid].TxAbort(TID);
-                        if (!isAborted)
-                        {
-                            break;
-                        }
+                        break;
                     }
                 }
-                else
-                {
-                    return true;
-                }
-
-                return isAborted;
             }
-
-        }
-
-        /// <summary>
-        /// Force to dump the server current status to console
-        /// </summary>
-        public void DumpStatus()
-        {
-            lock (this)
+            else
             {
-                Console.WriteLine("\n---------------------Server Status (Start)------------------------");
-                foreach (var val in padIntActiveList)
-                {
-                    Console.WriteLine("Uid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited);
-                    foreach (var tentative in val.Value.TentativeList)
-                    {
-                        Console.WriteLine("Tentative TID = " + tentative.WriteTS + " Value = " + tentative.Value);
-                    }
-                    Console.WriteLine("\n");
-                }
-                Console.WriteLine("---------------------Server Status (END)------------------------\n");
+                return true;
             }
+
+            return isAborted;
         }
 
         #endregion
@@ -293,16 +275,15 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         private List<int> GetUidsRelatedToTid(long TID)
         {
-            lock (this)
+            List<int> uids = new List<int>();
+            Dictionary<int, ServerPadInt> tempPadIntActiveList = new Dictionary<int, ServerPadInt>(padIntActiveList);
+            foreach (var item in tempPadIntActiveList)
             {
-                List<int> uids = new List<int>();
-                foreach (var item in padIntActiveList)
-                {
-                    if (item.Value.TentativeList.Exists(x => x.WriteTS == TID))
-                        uids.Add(item.Key);
-                }
-                return uids;
+                if (item.Value.TentativeList.Exists(x => x.WriteTS == TID))
+                    uids.Add(item.Key);
             }
+            return uids;
+
         }
 
         #endregion

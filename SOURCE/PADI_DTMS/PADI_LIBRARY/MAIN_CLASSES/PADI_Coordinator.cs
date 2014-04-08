@@ -35,32 +35,42 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool Commit(long tid, int[] uidArray)
         {
-            lock (this)
-            {
-                bool finished = false;
-                GenerateCommitRequests(tid, uidArray);
-                GatherCanCommitVotes(tid);
+            bool finished = false;
+            GenerateCommitRequests(tid, uidArray);
+            GatherCanCommitVotes(tid);
 
-                if (transactionIdDict[tid].Exists(x => x.Vote == false))
+            if (transactionIdDict[tid].Exists(x => x.Vote == false))
+            {
+                //TODO: Send Abort to all the servers
+            }
+            else
+            {
+                TransactionDoCommit(tid);
+                finished = CheckHasCommitted(tid);
+                //TODO: After everyone commits update the replicas
+                if (finished)
                 {
-                    //TODO: Send Abort to all the servers
+                    transactionIdDict.Remove(tid);
                 }
                 else
                 {
-                    TransactionDoCommit(tid);
-                    finished = CheckHasCommitted(tid);
-                    //TODO: After everyone commits update the replicas
-                    if (finished)
-                    {
-                        transactionIdDict.Remove(tid);
-                    }
-                    else
-                    {
-                        //TODO: Send Abort to all the servers
-                    }
+                    //TODO: Send Abort to all the servers
                 }
-                return finished;
             }
+            return finished;
+
+        }
+
+        /// <summary>
+        /// Abort the transaction contacting object servers
+        /// </summary>
+        /// <param name="tid"></param>
+        /// <param name="uidArray"></param>
+        /// <returns></returns>
+        public bool Abort(long tid, int[] uidArray)
+        {
+            //TODO: Handle abort with object servers same as commit
+            return true;
         }
 
         /// <summary>
@@ -71,22 +81,26 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool AbortTxn(long tid)
         {
+
+            //NOTE: There can be a situation where no commitR in the dictionary.
+            //This method works if transaction commits first and aborts after that.
+            //If abort occur directly, this will not work
             PADI_Worker worker;
-            lock (this)
+
+            foreach (var commitR in transactionIdDict[tid])
             {
-                foreach (var commitR in transactionIdDict[tid])
-                {
-                    worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), 
-                        Common.GenerateTcpUrl(commitR.Server.ServerIp, commitR.Server.ServerPort, 
-                        Constants.OBJECT_TYPE_PADI_WORKER));
-                    commitR.HasAborted = worker.Abort(tid);
-                    transactionIdDict[tid].Remove(commitR); // Remove the requests as well?
-                }
-                
+                worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker),
+                    Common.GenerateTcpUrl(commitR.Server.ServerIp, commitR.Server.ServerPort,
+                    Constants.OBJECT_TYPE_PADI_WORKER));
+                commitR.HasAborted = worker.Abort(tid);
+                transactionIdDict[tid].Remove(commitR); // Remove the requests as well?
             }
+
+
             //TODO: Handle abort with object servers same as commit
             return true;
         }
+
 
         /// <summary>
         /// Create a Transaction in the below format.
@@ -124,13 +138,10 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         private long GetTransactionId()
         {
-            lock (this)
-            {
                 Thread.Sleep(1);
                 long tid = DateTime.Now.Ticks;
                 transactionIdDict.Add(tid, new List<CommitRequestStatus>());
-                return tid;
-            }
+                return tid;         
         }
 
         /// <summary>

@@ -3,6 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
+using System.Security.Permissions;
 using System.Text;
 
 #endregion
@@ -16,10 +18,15 @@ namespace PADI_LIBRARY
 
         public TxException() : base() { }
         public TxException(string message) : base(message) { }
-        public TxException(string message, System.Exception inner) : base(message, inner) { }
- 
-        protected TxException(System.Runtime.Serialization.SerializationInfo info,
-            System.Runtime.Serialization.StreamingContext context) { }
+        public TxException(string message, System.Exception inner) : base(message, inner) { } 
+
+        protected TxException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+        [SecurityPermissionAttribute(SecurityAction.Demand,SerializationFormatter = true)]
+        public override void  GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            base.GetObjectData(info, context);
+        }
 
         #endregion
     }

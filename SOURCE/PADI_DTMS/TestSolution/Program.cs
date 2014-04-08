@@ -15,14 +15,45 @@ namespace TestSolution
            // DateTimeDiffCheck();
            // CheckTicks();
            // p.Call();
-            p.TestException();
+            //p.TestException();
+           // A a = new A();
+            //Thread t = new Thread(new ThreadStart(a.TestA));
+            //t.Start();
+            //a.TestA();
+            Thread t = new Thread(new ParameterizedThreadStart(p.ThreadTest));
+            t.Start(10);
+            t = new Thread(new ParameterizedThreadStart(p.ThreadTest));
+            t.Start(20);
+        }
+
+        public void ThreadTest(object obj)
+        {
+            Int32 val = (Int32)obj;
+            Console.WriteLine("val = "+val);
+            val = val + 1;
+            val = val + 1;
+            val = val + 1;
+            val = val + 1;
+            val = val + 1;
+            val = val + 1;
+            val = val + 1;
+            val = val + 1;
+            val = val + 1;
+            val = val + 1;
+            Console.WriteLine("val = " + val);
+
+        }
+
+        public void TestExceptionExecution()
+        {
+            throw new TxException("This is test exception");
         }
 
         public void TestException()
         {
             try
             {
-                throw new TxException("This is test exception");
+                TestExceptionExecution();
             }
             catch (TxException ex)
             {
