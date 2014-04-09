@@ -9,7 +9,7 @@ using System.Text;
 
 namespace PADI_LIBRARY
 {
-    class CommitRequestStatus
+    class OperationRequestStatus
     {
         #region Initialization
         private ObjectServer server;

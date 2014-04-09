@@ -20,6 +20,7 @@ namespace PADI_LIBRARY
         List<int> padIntUids;
         Information info;
         long transactionId;
+        bool isCommited = false;
 
         public long TransactionId
         {
@@ -176,7 +177,6 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool TxCommit()
         {
-            bool isCommited = false;
             int[] uidArray = padIntUids.ToArray();
             isCommited = coordinator.Commit(TransactionId, uidArray);
             return isCommited;
@@ -184,15 +184,22 @@ namespace PADI_LIBRARY
         }
 
         /// <summary>
-        /// Call coordinator to abort the transaction
+        /// Hande pre- and post-transaction abort
+        /// Rollback transaction if commited or abort transaction's tentative objects
         /// </summary>
         /// <returns></returns>
         public bool TxAbort()
         {
-            //TODO: abort the transaction. Call coordinator's abort method. The implementation is similar to commit.
-            bool isAborted = false;
-            isAborted = coordinator.AbortTxn(TransactionId);
-            return isAborted;
+            int[] uidArray = padIntUids.ToArray();
+            if (isCommited)
+            {
+                //TODO: abort the transaction. Call coordinator's abort method. The implementation is similar to commit.
+                return coordinator.AbortTxn(TransactionId);
+            }
+            else
+            {
+                return coordinator.Abort(TransactionId, uidArray);
+            }
             
         }
 

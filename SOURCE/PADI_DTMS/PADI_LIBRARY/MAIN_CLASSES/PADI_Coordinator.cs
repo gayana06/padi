@@ -15,12 +15,12 @@ namespace PADI_LIBRARY
         #region Initialization
 
         PADI_Master master;
-        Dictionary<long, List<CommitRequestStatus>> transactionIdDict;
+        Dictionary<long, List<OperationRequestStatus>> transactionIdDict;
 
         public PADI_Coordinator(PADI_Master master)
         {
             this.master = master;
-            transactionIdDict = new Dictionary<long, List<CommitRequestStatus>>();
+            transactionIdDict = new Dictionary<long, List<OperationRequestStatus>>();
         }
 
         #endregion
@@ -62,6 +62,7 @@ namespace PADI_LIBRARY
         }
 
         /// <summary>
+        /// Pre-commit Abort
         /// Abort the transaction contacting object servers
         /// </summary>
         /// <param name="tid"></param>
@@ -69,6 +70,36 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool Abort(long tid, int[] uidArray)
         {
+            ObjectServer selectedSrv;
+            OperationRequestStatus abortReq;
+            PADI_Worker worker;
+
+            foreach (var uid in uidArray)
+            {
+                selectedSrv = master.WorkerServerList[uid % master.WorkerServerList.Count()];
+                if (!transactionIdDict[tid].Exists(x => x.Server == selectedSrv))
+                {
+                    abortReq = new OperationRequestStatus();
+                    abortReq.Server = selectedSrv;
+                    abortReq.HasAborted = false;
+                    transactionIdDict[tid].Add(abortReq);
+                }
+            }
+
+            foreach (var abortRequest in transactionIdDict[tid])
+            {
+                worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker),
+                    Common.GenerateTcpUrl(abortRequest.Server.ServerIp, abortRequest.Server.ServerPort,
+                    Constants.OBJECT_TYPE_PADI_WORKER));
+                abortRequest.HasAborted = worker.Abort(tid);
+
+                if (abortRequest.HasAborted)
+                {
+                    transactionIdDict[tid].Remove(abortRequest);
+                }
+
+            }
+
             //TODO: Handle abort with object servers same as commit
             return true;
         }
@@ -87,17 +118,14 @@ namespace PADI_LIBRARY
             //If abort occur directly, this will not work
             PADI_Worker worker;
 
-            foreach (var commitR in transactionIdDict[tid])
+            foreach (var rollbackReq in transactionIdDict[tid])
             {
                 worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker),
-                    Common.GenerateTcpUrl(commitR.Server.ServerIp, commitR.Server.ServerPort,
+                    Common.GenerateTcpUrl(rollbackReq.Server.ServerIp, rollbackReq.Server.ServerPort,
                     Constants.OBJECT_TYPE_PADI_WORKER));
-                commitR.HasAborted = worker.Abort(tid);
-                transactionIdDict[tid].Remove(commitR); // Remove the requests as well?
+                rollbackReq.HasAborted = worker.Abort(tid);
+                transactionIdDict[tid].Remove(rollbackReq); // Remove the requests as well?
             }
-
-
-            //TODO: Handle abort with object servers same as commit
             return true;
         }
 
@@ -140,7 +168,7 @@ namespace PADI_LIBRARY
         {
                 Thread.Sleep(1);
                 long tid = DateTime.Now.Ticks;
-                transactionIdDict.Add(tid, new List<CommitRequestStatus>());
+                transactionIdDict.Add(tid, new List<OperationRequestStatus>());
                 return tid;         
         }
 
@@ -152,14 +180,14 @@ namespace PADI_LIBRARY
         private void GenerateCommitRequests(long tid, int[] uidArray)
         {
             ObjectServer selectedServer;
-            CommitRequestStatus commitRS;
+            OperationRequestStatus commitRS;
 
             foreach (var uid in uidArray)
             {
                 selectedServer = master.WorkerServerList[uid % master.WorkerServerList.Count()];
                 if (!transactionIdDict[tid].Exists(x => x.Server == selectedServer))
                 {
-                    commitRS = new CommitRequestStatus();
+                    commitRS = new OperationRequestStatus();
                     commitRS.Server = selectedServer;
                     commitRS.Vote = false;
                     commitRS.HasAborted = false;
