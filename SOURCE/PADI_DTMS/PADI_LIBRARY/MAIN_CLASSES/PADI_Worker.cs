@@ -224,10 +224,31 @@ namespace PADI_LIBRARY
             Dictionary<int, ServerPadInt> tempPadIntActiveList = new Dictionary<int, ServerPadInt>(padIntActiveList);
             foreach (var val in tempPadIntActiveList)
             {
-                Console.WriteLine("Uid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited);
-                foreach (var tentative in val.Value.TentativeList)
+                Console.WriteLine("\nUid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited+", TID = "+val.Value.WriteTS);
+                Console.WriteLine("\nReaders of this UID");
+                if (val.Value.ReadTSList.Count > 0)
                 {
-                    Console.WriteLine("Tentative TID = " + tentative.WriteTS + " Value = " + tentative.Value);
+                    foreach (var reader in val.Value.ReadTSList)
+                    {
+                        Console.WriteLine("TID = " + reader);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No transaction has read this UID");
+                }
+
+                Console.WriteLine("\nTentative writes of this UID");
+                if (val.Value.TentativeList.Count > 0)
+                {
+                    foreach (var tentative in val.Value.TentativeList)
+                    {
+                        Console.WriteLine("Tentative TID = " + tentative.WriteTS + " Value = " + tentative.Value);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No tentative writes for this UID");
                 }
                 Console.WriteLine("\n");
             }

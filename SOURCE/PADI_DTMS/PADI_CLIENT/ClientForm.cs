@@ -32,13 +32,13 @@ namespace PADI_CLIENT
         private string[] operationArray;
 
 
-        PADI_Client client;
+      //  PADI_Client client;
 
         public ClientForm()
         {
             InitializeComponent();
-            client = new PADI_Client();
-            client.Init();
+           // client = new PADI_Client();
+            PADI_Client.Init();
         }
 
         public void Start()
@@ -59,18 +59,18 @@ namespace PADI_CLIENT
                         switch (tmp[0])
                         {
                             case BEGIN_TRANSACTION:
-                                status = client.TxBegin();
+                                status = PADI_Client.TxBegin();
                                 UpdateResultPanel("Transaction started. " + status);
                                 break;
                             case END_TRANSACTION:
-                                status = client.TxCommit();
+                                status = PADI_Client.TxCommit();
                                 UpdateResultPanel("Transaction committed. " + status);
                                 break;
                             case CREATE_PADINT:
-                                padInt = client.CreatePadInt(Int32.Parse(tmp[1]));
+                                padInt = PADI_Client.CreatePadInt(Int32.Parse(tmp[1]));
                                 break;
                             case ACCESS_PADINT:
-                                padInt = client.AccessPadInt(Int32.Parse(tmp[1]));
+                                padInt = PADI_Client.AccessPadInt(Int32.Parse(tmp[1]));
                                 break;
                             case READ:
                                 if (padInt != null)
@@ -88,7 +88,7 @@ namespace PADI_CLIENT
                                     Console.WriteLine("PadInt is null - WRITE");
                                 break;
                             case STATUS_DUMP:
-                                client.Status();
+                                PADI_Client.Status();
                                 UpdateResultPanel("Dumped Status");
                                 break;
                         }

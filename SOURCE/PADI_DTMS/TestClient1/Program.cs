@@ -27,25 +27,25 @@ namespace TestClient1
         PADI_Client client;
         public Program()
         {
-            client = new PADI_Client();
-            client.Init();
+            //client = new PADI_Client();
+            PADI_Client.Init();
         }
 
         public void Transaction2()
         {
             try
             {
-                client.TxBegin();
-                PadInt padInt = client.AccessPadInt(1);
+                PADI_Client.TxBegin();
+                PadInt padInt = PADI_Client.AccessPadInt(1);
                 padInt.Write(102);
                 padInt.Read();
-                padInt = client.AccessPadInt(2);
+                padInt = PADI_Client.AccessPadInt(2);
                 padInt.Write(202);
                 padInt.Read();
-                padInt = client.AccessPadInt(3);
+                padInt = PADI_Client.AccessPadInt(3);
                 padInt.Write(302);
                 padInt.Read();
-                client.TxCommit();
+                PADI_Client.TxCommit();
             }
             catch (TxException ex)
             {
@@ -61,14 +61,14 @@ namespace TestClient1
         {
             try
             {
-                client.TxBegin();
-                PadInt padInt = client.AccessPadInt(1);
+                PADI_Client.TxBegin();
+                PadInt padInt = PADI_Client.AccessPadInt(1);
                 padInt.Write(103);
-                padInt = client.AccessPadInt(2);
+                padInt = PADI_Client.AccessPadInt(2);
                 padInt.Write(203);
-                padInt = client.AccessPadInt(3);
+                padInt = PADI_Client.AccessPadInt(3);
                 padInt.Write(303);
-                client.TxCommit();
+                PADI_Client.TxCommit();
             }
             catch (Exception ex)
             {

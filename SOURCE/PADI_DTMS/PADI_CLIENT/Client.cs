@@ -29,11 +29,9 @@ namespace PADI_CLIENT
         private string[] operationArray;
 
 
-        PADI_Client client;
         public Client()
         {
-            client = new PADI_Client();
-            client.Init();
+            PADI_Client.Init();
         }
 
         public void Start()
@@ -55,18 +53,18 @@ namespace PADI_CLIENT
                     switch (tmp[0])
                     {
                         case BEGIN_TRANSACTION:
-                            status = client.TxBegin();
+                            status = PADI_Client.TxBegin();
                             Console.WriteLine("Transaction started. " + status);
                             break;
                         case END_TRANSACTION:
-                            status = client.TxCommit();
+                            status = PADI_Client.TxCommit();
                             Console.WriteLine("Transaction committed. " + status);
                             break;
                         case CREATE_PADINT:
-                            padInt = client.CreatePadInt(Int32.Parse(tmp[1]));
+                            padInt = PADI_Client.CreatePadInt(Int32.Parse(tmp[1]));
                             break;
                         case ACCESS_PADINT:
-                            padInt = client.AccessPadInt(Int32.Parse(tmp[1]));
+                            padInt = PADI_Client.AccessPadInt(Int32.Parse(tmp[1]));
                             break;
                         case READ:
                             if (padInt != null)
@@ -84,7 +82,7 @@ namespace PADI_CLIENT
                                 Console.WriteLine("PadInt is null - WRITE");
                             break;
                         case STATUS_DUMP:
-                            client.Status();
+                            PADI_Client.Status();
                             Console.WriteLine("Dumped Status");
                             break;
                     }
@@ -105,26 +103,6 @@ namespace PADI_CLIENT
             }
 
         }
-
-        public void Transaction1()
-        {
-            try
-            {
-                client.TxBegin();
-                PadInt padInt = client.AccessPadInt(1);                
-                padInt.Write(101);
-                padInt = client.AccessPadInt(2);
-                padInt.Write(201);
-                padInt = client.AccessPadInt(3);
-                padInt.Write(301);
-                client.TxCommit();                
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }         
-        }
-
 
     }
 

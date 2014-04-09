@@ -62,46 +62,26 @@ namespace PADI_LIBRARY
         }
 
         /// <summary>
-        /// Pre-commit Abort
         /// Abort the transaction contacting object servers
         /// </summary>
         /// <param name="tid"></param>
         /// <param name="uidArray"></param>
         /// <returns></returns>
-        public bool Abort(long tid, int[] uidArray)
-        {
-            ObjectServer selectedSrv;
-            OperationRequestStatus abortReq;
-            PADI_Worker worker;
-
-            foreach (var uid in uidArray)
+        public bool AbortTxn(long tid, int[] uidArray)
+        {           
+            bool finished = false;
+            GenerateCommitRequests(tid, uidArray);
+            TransactionDoAbort(tid);
+            finished = CheckHasAborted(tid);            
+            if (finished)
             {
-                selectedSrv = master.WorkerServerList[uid % master.WorkerServerList.Count()];
-                if (!transactionIdDict[tid].Exists(x => x.Server == selectedSrv))
-                {
-                    abortReq = new OperationRequestStatus();
-                    abortReq.Server = selectedSrv;
-                    abortReq.HasAborted = false;
-                    transactionIdDict[tid].Add(abortReq);
-                }
+                transactionIdDict.Remove(tid);
             }
-
-            foreach (var abortRequest in transactionIdDict[tid])
+            else
             {
-                worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker),
-                    Common.GenerateTcpUrl(abortRequest.Server.ServerIp, abortRequest.Server.ServerPort,
-                    Constants.OBJECT_TYPE_PADI_WORKER));
-                abortRequest.HasAborted = worker.Abort(tid);
-
-                if (abortRequest.HasAborted)
-                {
-                    transactionIdDict[tid].Remove(abortRequest);
-                }
-
-            }
-
-            //TODO: Handle abort with object servers same as commit
-            return true;
+                //TODO: retry abort
+            }            
+            return finished;
         }
 
         /// <summary>
@@ -112,21 +92,29 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool AbortTxn(long tid)
         {
-
             //NOTE: There can be a situation where no commitR in the dictionary.
-            //This method works if transaction commits first and aborts after that.
-            //If abort occur directly, this will not work
+            //This method works if transaction commits first but fails and aborts after that.
+            
             PADI_Worker worker;
-
-            foreach (var rollbackReq in transactionIdDict[tid])
+            bool finished = false;
+            foreach (var commitR in transactionIdDict[tid])
             {
                 worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker),
-                    Common.GenerateTcpUrl(rollbackReq.Server.ServerIp, rollbackReq.Server.ServerPort,
+                    Common.GenerateTcpUrl(commitR.Server.ServerIp, commitR.Server.ServerPort,
                     Constants.OBJECT_TYPE_PADI_WORKER));
-                rollbackReq.HasAborted = worker.Abort(tid);
-                transactionIdDict[tid].Remove(rollbackReq); // Remove the requests as well?
+                commitR.HasAborted = worker.Abort(tid);
             }
-            return true;
+
+            finished = CheckHasAborted(tid);
+            if (finished)
+            {
+                transactionIdDict.Remove(tid);
+            }
+            else
+            {
+                //TODO: retry abort
+            }
+            return finished;
         }
 
 
@@ -225,6 +213,20 @@ namespace PADI_LIBRARY
         }
 
         /// <summary>
+        /// Confirm transaction abort to the object servers
+        /// </summary>
+        /// <param name="tid"></param>
+        private void TransactionDoAbort(long tid)
+        {
+            PADI_Worker worker;
+            foreach (var commitR in transactionIdDict[tid])
+            {
+                worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(commitR.Server.ServerIp, commitR.Server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                commitR.HasAborted = worker.Abort(tid);
+            }
+        }
+
+        /// <summary>
         /// Check all object has committed the transaction
         /// </summary>
         /// <param name="tid"></param>
@@ -241,6 +243,25 @@ namespace PADI_LIBRARY
                 hasCommited = true;
             }
             return hasCommited;
+        }
+
+        /// <summary>
+        /// Check all object has committed the transaction
+        /// </summary>
+        /// <param name="tid"></param>
+        /// <returns></returns>
+        private bool CheckHasAborted(long tid)
+        {
+            bool hasAborted = false;
+            if (transactionIdDict[tid].Exists(x => x.HasAborted == false))
+            {
+                hasAborted = false;
+            }
+            else
+            {
+                hasAborted = true;
+            }
+            return hasAborted;
         }
 
         #endregion

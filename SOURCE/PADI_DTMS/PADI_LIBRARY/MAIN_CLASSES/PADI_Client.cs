@@ -14,15 +14,14 @@ namespace PADI_LIBRARY
     {
         #region Initialization
 
-        PADI_Coordinator coordinator;
-        PADI_Master master;
-        List<PADI_Worker> workers;
-        List<int> padIntUids;
-        Information info;
-        long transactionId;
-        bool isCommited = false;
+        private static PADI_Coordinator coordinator;
+        private static PADI_Master master;
+        private static List<PADI_Worker> workers;
+        private static List<int> padIntUids;
+        private static Information info;
+        private static long transactionId;
 
-        public long TransactionId
+        public static long TransactionId
         {
             get { return transactionId; }
             set { transactionId = value; }
@@ -32,7 +31,7 @@ namespace PADI_LIBRARY
 
         #region Public Members
 
-        public bool Init()
+        public static bool Init()
         {
             bool isInitSuccessful = false;
             try
@@ -67,7 +66,7 @@ namespace PADI_LIBRARY
         /// </summary>
         /// <param name="uid"></param>
         /// <returns></returns>
-        public PadInt CreatePadInt(int uid)
+        public static PadInt CreatePadInt(int uid)
         {
             PadInt padInt = null;
             int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
@@ -75,7 +74,7 @@ namespace PADI_LIBRARY
             {
                 if (workers[modIndex].CreatePadInt(uid))
                 {
-                    padInt = new PadInt(uid, this);
+                    padInt = new PadInt(uid);
                     padInt.Worker = workers[modIndex];
                     UpdatePadIntTrack(uid);
                     Console.WriteLine("PadInt successfully created, UID = " + uid);
@@ -101,7 +100,7 @@ namespace PADI_LIBRARY
         /// </summary>
         /// <param name="uid"></param>
         /// <returns></returns>
-        public PadInt AccessPadInt(int uid)
+        public static PadInt AccessPadInt(int uid)
         {
             int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
             PadInt padInt = null;
@@ -109,7 +108,7 @@ namespace PADI_LIBRARY
             {
                 if (workers[modIndex].AccessPadInt(uid))
                 {
-                    padInt = new PadInt(uid, this);
+                    padInt = new PadInt(uid);
                     padInt.Worker = workers[modIndex];
                     UpdatePadIntTrack(uid);
                     Console.WriteLine("PadInt successfully retrieved, UID = " + uid);
@@ -134,10 +133,10 @@ namespace PADI_LIBRARY
         /// Set the TID from coordinator and load server map if the available map is expired
         /// </summary>
         /// <returns></returns>
-        public bool TxBegin()
+        public static bool TxBegin()
         {
             bool trancationEstablished = false;
-            //Clear padIntUids. This is only required if multiple transactions are checked in a single machine.
+            //NOte: Clear padIntUids. This is only required if multiple transactions are checked in a single machine.
             padIntUids.Clear();
             try
             {
@@ -165,7 +164,7 @@ namespace PADI_LIBRARY
         /// Dumps the status of worker serers to their consoles.
         /// </summary>
         /// <returns></returns>
-        public bool Status()
+        public static bool Status()
         {
             master.DumpObjectServerStatus();
             return true;
@@ -175,31 +174,27 @@ namespace PADI_LIBRARY
         /// Call the coordinator to proceed with transaction commit
         /// </summary>
         /// <returns></returns>
-        public bool TxCommit()
+        public static bool TxCommit()
         {
+            bool isCommited = false;
             int[] uidArray = padIntUids.ToArray();
             isCommited = coordinator.Commit(TransactionId, uidArray);
+            Console.WriteLine("Transaction commit status is "+isCommited);
             return isCommited;
 
         }
 
         /// <summary>
-        /// Hande pre- and post-transaction abort
-        /// Rollback transaction if commited or abort transaction's tentative objects
+        /// Call coordinator to abort the transaction
         /// </summary>
         /// <returns></returns>
-        public bool TxAbort()
+        public static bool TxAbort()
         {
+            //TODO: abort the transaction. Call coordinator's abort method. The implementation is similar to commit.
+            bool isAborted = false;
             int[] uidArray = padIntUids.ToArray();
-            if (isCommited)
-            {
-                //TODO: abort the transaction. Call coordinator's abort method. The implementation is similar to commit.
-                return coordinator.AbortTxn(TransactionId);
-            }
-            else
-            {
-                return coordinator.Abort(TransactionId, uidArray);
-            }
+            isAborted = coordinator.AbortTxn(TransactionId,uidArray);
+            return isAborted;
             
         }
 
@@ -208,9 +203,10 @@ namespace PADI_LIBRARY
         /// </summary>
         /// <param name="url"></param>
         /// <returns></returns>
-        public bool Fail(string url)
+        public static bool Fail(string url)
         {
             //TODO: this method makes the server at the URL stop responding to external calls except for a Recover call
+            Console.WriteLine("Implementation pending");
             return true;
         }
 
@@ -220,10 +216,11 @@ namespace PADI_LIBRARY
         /// </summary>
         /// <param name="url"></param>
         /// <returns></returns>
-        public bool Freeze(string url)
+        public static bool Freeze(string url)
         {
             //TODO: this method makes the server at URL stop responding to external calls but it maintains all calls for later reply, as if the communication to that server were
             //only delayed.
+            Console.WriteLine("Implementation pending");
             return true;
         }
 
@@ -232,9 +229,10 @@ namespace PADI_LIBRARY
         /// </summary>
         /// <param name="url"></param>
         /// <returns></returns>
-        public bool Recover(string url)
+        public static bool Recover(string url)
         {
             //TODO: recover the Freeze and Fail.
+            Console.WriteLine("Implementation pending");
             return true;
         }
 
@@ -243,7 +241,7 @@ namespace PADI_LIBRARY
 
         #region Private Members
 
-        private void LoadServerMap()
+        private static void LoadServerMap()
         {
             info.ObjectServerMap = master.WorkerServerList.ToArray();
             workers.Clear();
@@ -259,7 +257,7 @@ namespace PADI_LIBRARY
 
         }
 
-        private void UpdatePadIntTrack(int uid)
+        private static void UpdatePadIntTrack(int uid)
         {
             if (!padIntUids.Contains(uid))
             {

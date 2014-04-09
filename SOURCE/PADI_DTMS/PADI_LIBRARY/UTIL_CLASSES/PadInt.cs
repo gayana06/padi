@@ -31,10 +31,9 @@ namespace PADI_LIBRARY
 
         PADI_Client client;
 
-        public PadInt(int uID, PADI_Client client)
+        public PadInt(int uID)
         {
             this.UID = uID;
-            this.client = client;
         }
 
         #endregion
@@ -50,11 +49,12 @@ namespace PADI_LIBRARY
             int value;
             try
             {
-                value= worker.Read(this.UID, client.TransactionId);
+                value= worker.Read(this.UID, PADI_Client.TransactionId);
             }
             catch (TxException ex)
             {
                 Common.Logger().LogError(ex.Message,ex.StackTrace,ex.Source);
+                Console.WriteLine(ex.Message);
                 throw ex;
             }
             return value;
@@ -68,7 +68,7 @@ namespace PADI_LIBRARY
         {
             try
             {
-                worker.Write(this.UID, client.TransactionId, value);
+                worker.Write(this.UID, PADI_Client.TransactionId, value);
             }
             catch (TxException ex)
             {

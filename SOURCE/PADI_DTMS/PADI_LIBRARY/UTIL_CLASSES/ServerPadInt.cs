@@ -153,16 +153,20 @@ namespace PADI_LIBRARY
                     {
                         if (TentativeList.Exists(x => x.WriteTS < TID))
                         {
-                            Console.WriteLine("Read operation waits. TID : "+TID);
+                            Console.WriteLine("Read operation waits. TID : " + TID);
                             Monitor.Wait(this);
                         }
                         else
                         {
                             val = Value;
-                            Console.WriteLine("Read Value = "+val+", TID = "+TID);
+                            Console.WriteLine("Read Value = " + val + ", TID = " + TID);
                             readTSList.Add(TID);
                             break;
                         }
+                    }
+                    else
+                    {
+                        throw new TxException("No committed version exists to read. UID = "+this.Uid+" ,TID = "+TID);                        
                     }
                 }
                 Console.WriteLine("---------------Read (END, TID=" + TID + ")-------------------\n");           
@@ -177,13 +181,19 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public bool TxAbort(long TID)
         {
-            bool isAbort = false;
-            if (TentativeList.Exists(x => x.WriteTS == TID))
+            lock (this)
             {
-                TentativeList.Remove(TentativeList.Find(x=>x.WriteTS==TID));               
-                isAbort = true;
+                bool isAbort = false;
+                if (TentativeList.Exists(x => x.WriteTS == TID))
+                {
+                    TentativeList.Remove(TentativeList.Find(x => x.WriteTS == TID));
+                    Monitor.PulseAll(this);
+                    isAbort = true;
+                }
+                else
+                    isAbort = true;
+                return isAbort;
             }
-            return isAbort;
         }
 
         /// <summary>
