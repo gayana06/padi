@@ -4,7 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
 using System.Text;
+using System.Threading;
 
 #endregion
 
@@ -20,6 +22,7 @@ namespace PADI_LIBRARY
         private static List<int> padIntUids;
         private static Information info;
         private static long transactionId;
+        public delegate bool AsyncOperation(long TID,int[] uidArray);
 
         public static long TransactionId
         {
@@ -42,6 +45,7 @@ namespace PADI_LIBRARY
                 workers = new List<PADI_Worker>();
                 info = new Information();
                 padIntUids = new List<int>();
+                LoadServerMap();
                 isInitSuccessful = true;
             }
             catch (Exception ex)
@@ -49,6 +53,54 @@ namespace PADI_LIBRARY
                 Console.WriteLine(ex.Message);
             }
             return isInitSuccessful;
+        }
+
+        /// <summary>
+        /// Commit request will be replied here
+        /// </summary>
+        /// <param name="ar"></param>
+        public  static void AsyncCommitCallBack(IAsyncResult ar)
+        {
+            try
+            {
+                AsyncOperation del = (AsyncOperation)((AsyncResult)ar).AsyncDelegate;
+                Console.WriteLine("Commit is successful");
+            }
+            catch (TxException ex)
+            {
+                Console.WriteLine(ex.Message);
+                throw ex;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                throw ex;
+            }
+        }
+
+        /// <summary>
+        /// Abort request will be replied here
+        /// </summary>
+        /// <param name="ar"></param>
+        public static void AsyncAbortCallBack(IAsyncResult ar)
+        {
+            try
+            {
+                AsyncOperation del = (AsyncOperation)((AsyncResult)ar).AsyncDelegate;
+                Console.WriteLine("Abort is successful");
+            }
+            catch (TxException ex)
+            {
+                Console.WriteLine(ex.Message);
+                Console.WriteLine("Abort failed");
+                //throw ex;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                Console.WriteLine("Abort failed");
+                //throw ex;
+            }
         }
 
         /// <summary>
@@ -178,10 +230,19 @@ namespace PADI_LIBRARY
         {
             bool isCommited = false;
             int[] uidArray = padIntUids.ToArray();
-            isCommited = coordinator.Commit(TransactionId, uidArray);
-            Console.WriteLine("Transaction commit status is "+isCommited);
+            if (HasAnyServerFreezed(uidArray))
+            {
+                AsyncOperation commit = new AsyncOperation(coordinator.Commit);
+                AsyncCallback commitCallback = new AsyncCallback(AsyncCommitCallBack);
+                IAsyncResult RemAr = commit.BeginInvoke(TransactionId, uidArray, commitCallback, null);
+                Console.WriteLine("Commit delays due to the freezed server.");
+            }
+            else
+            {
+                isCommited = coordinator.Commit(TransactionId, uidArray);
+                Console.WriteLine("Transaction commit status is " + isCommited);                
+            }
             return isCommited;
-
         }
 
         /// <summary>
@@ -192,10 +253,34 @@ namespace PADI_LIBRARY
         {
             //TODO: abort the transaction. Call coordinator's abort method. The implementation is similar to commit.
             bool isAborted = false;
-            int[] uidArray = padIntUids.ToArray();
-            isAborted = coordinator.AbortTxn(TransactionId,uidArray);
+            try
+            {
+                if (padIntUids.Count() > 0)
+                {
+                    int[] uidArray = padIntUids.ToArray();
+                    if (HasAnyServerFreezed(uidArray))
+                    {
+                        AsyncOperation abort = new AsyncOperation(coordinator.AbortTxn);
+                        AsyncCallback abortCallback = new AsyncCallback(AsyncAbortCallBack);
+                        IAsyncResult RemAr = abort.BeginInvoke(TransactionId, uidArray, abortCallback, null);
+                        Console.WriteLine("Abort delays due to the freezed server.");
+                    }
+                    else
+                    {
+                        isAborted = coordinator.AbortTxn(TransactionId, uidArray);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No UID has been manipulated to abort.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Common.Logger().LogError(ex.Message,ex.StackTrace,ex.Source);
+                Console.WriteLine("Default abort is not executed.");
+            }
             return isAborted;
-            
         }
 
         /// <summary>
@@ -206,7 +291,22 @@ namespace PADI_LIBRARY
         public static bool Fail(string url)
         {
             //TODO: this method makes the server at the URL stop responding to external calls except for a Recover call
-            Console.WriteLine("Implementation pending");
+           // workerChannel = new TcpChannel(25052);
+            info.ObjectServerMap = master.WorkerServerList.ToArray();
+            foreach (var server in info.ObjectServerMap)
+            {
+                if (server.TcpUrl == url)
+                {
+                    PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), url);
+                    worker.Fail();
+                    Console.WriteLine("Wait until master detects failure");
+                    Thread.Sleep(13000);
+                    Console.WriteLine("Server Failed; server url: {0}, server name: {1}", server.TcpUrl, server.ServerName);
+                    break;
+                }
+                else
+                    Console.WriteLine("OOps the specified server could not be located!");
+            }
             return true;
         }
 
@@ -220,7 +320,9 @@ namespace PADI_LIBRARY
         {
             //TODO: this method makes the server at URL stop responding to external calls but it maintains all calls for later reply, as if the communication to that server were
             //only delayed.
-            Console.WriteLine("Implementation pending");
+            PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker),url);
+            worker.Freeze();
+            Console.WriteLine("Server Freezed");
             return true;
         }
 
@@ -232,10 +334,33 @@ namespace PADI_LIBRARY
         public static bool Recover(string url)
         {
             //TODO: recover the Freeze and Fail.
-            Console.WriteLine("Implementation pending");
+            PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), url);
+            worker.Recover();
+            coordinator.RecoverOperations();
+
+
+
+            Console.WriteLine("Server recovered");
+
+
+
+         //Failed recsover
+        /* info.ObjectServerMap = master.FailServerList.ToArray();
+            foreach (var server in info.ObjectServerMap)
+            {
+                if (server.TcpUrl == url)
+                {
+                    master.WorkerServerList.Add(server);
+                    master.UpdateRecoverList(server);
+                    Console.WriteLine("Server Recovered; server url: {0}, server name: {1}", server.TcpUrl, server.ServerName);
+                }
+                else
+                    Console.WriteLine("OOPs the specified server could not be found");
+            }*/
             return true;
         }
 
+        
 
         #endregion 
 
@@ -264,6 +389,22 @@ namespace PADI_LIBRARY
                 padIntUids.Add(uid);
             }
         }
+
+        private static bool HasAnyServerFreezed(int[] uidArray)
+        {
+            bool hasFreezed = false;
+            foreach (int uid in uidArray)
+            {
+                int modIndex = Common.GetModuloServerIndex(uid, info.ObjectServerMap);
+                if (workers[modIndex].IsThisServerFreezed)
+                {
+                    hasFreezed = true;
+                    break;
+                }
+            }
+            return hasFreezed;
+        }
+
 
         #endregion
     }

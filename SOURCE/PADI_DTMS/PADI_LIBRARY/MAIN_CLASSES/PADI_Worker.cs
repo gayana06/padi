@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 #endregion
 
@@ -14,15 +15,24 @@ namespace PADI_LIBRARY
     {
         #region Initialization
 
-        ObjectServer thisServer;
+        ObjectServer thisServer;         
         private ObjectServer[] objectServerList;
-
         private Dictionary<int,ServerPadInt> padIntActiveList;
-        
+       // private List<FreezedOperation> freezedOperations;
+       // private int freezeOperationIndex;
+       // bool isRecovering;
+        bool isThisServerFreezed;
+        bool isThisServerFailed;
+
+        public bool IsThisServerFreezed
+        {
+            get { return isThisServerFreezed; }
+            set { isThisServerFreezed = value; }
+        } 
+
         public PADI_Worker()
         {
             padIntActiveList = new Dictionary<int,ServerPadInt>();
-           
         }
 
         #endregion
@@ -57,8 +67,24 @@ namespace PADI_LIBRARY
         /// <param name="state"></param>
         public void SendHeartBeatMessage(object state)
         {
-            PADI_Master master = (PADI_Master)Activator.GetObject(typeof(PADI_Master), Common.GetMasterTcpUrl());
-            master.HeartBeatReceiver(thisServer.ServerName);
+            if (!isThisServerFailed)
+            {
+                PADI_Master master = (PADI_Master)Activator.GetObject(typeof(PADI_Master), Common.GetMasterTcpUrl());
+                //if (!master.FailServerList.Exists(s => s.ServerName == thisServer.ServerName))
+                master.HeartBeatReceiver(thisServer.ServerName);
+            }
+        }
+
+        /// <summary>
+        /// Fail the server. This will stop sending heartbeats to master 
+        /// </summary>
+        public void Fail()
+        {
+            if (!isThisServerFailed)
+            {
+                isThisServerFailed = true;
+                padIntActiveList.Clear();
+            }
         }
 
         /// <summary>
@@ -91,7 +117,13 @@ namespace PADI_LIBRARY
         {
             try
             {
-                return padIntActiveList[uid].Read(TID);
+                int result=padIntActiveList[uid].Read(TID);
+                lock (this)
+                {
+                    if (isThisServerFreezed)
+                        Monitor.Wait(this);
+                }
+                return result;
             }
             catch (Exception ex)
             {
@@ -106,8 +138,13 @@ namespace PADI_LIBRARY
         /// <param name="TID"></param>
         /// <param name="value"></param>
         public void Write(int uid, long TID, int value)
-        {
+        {            
             bool isWriteSuccessful = padIntActiveList[uid].Write(TID, value);
+            lock (this)
+            {
+                if (isThisServerFreezed)
+                    Monitor.Wait(this);
+            }
             if (!isWriteSuccessful)
             {
                 //TODO: Ask coordinator to abort the transaction TID
@@ -285,6 +322,160 @@ namespace PADI_LIBRARY
             return isAborted;
         }
 
+
+        public void Freeze()
+        {
+            /*
+            lock (this)
+            {
+                if (!isThisServerFreezed)
+                {
+                    freezeOperationIndex = 0;
+                    isRecovering = false;
+                    freezedOperations = new List<FreezedOperation>();
+                    isThisServerFreezed = true;
+                }
+            }
+             */
+
+            lock (this)
+            {                
+                if (!isThisServerFailed && !isThisServerFreezed)
+                {
+                    isThisServerFreezed = true;
+                }
+            }
+
+        }
+
+        public void Recover()
+        {
+            /* 
+            isRecovering = true;
+            RecoverFreezedOperations();
+            Monitor.PulseAll(this);
+            isRecovering = false;
+            isThisServerFreezed = false;
+             */
+            lock (this)
+            {
+                if (isThisServerFreezed)
+                {
+                    Monitor.PulseAll(this);
+                    isThisServerFreezed = false;
+                }
+                else if (isThisServerFailed)
+                {
+                    BootstrapMaster(thisServer.ServerPort);
+                    Console.WriteLine("Recovered failed server");
+                    isThisServerFailed = false;
+                }
+            }
+            
+        }
+
+        /*   Freeze old
+        
+                 /// <summary>
+                /// Async method invoked by the clients when server is freezed
+                /// </summary>
+                /// <param name="operation"></param>
+                /// <param name="TID"></param>
+                /// <param name="UID"></param>
+                /// <param name="value"></param>
+                /// <returns></returns>
+                public string ReadWriteWhenFreeze(string operation, long TID, int UID, int value)
+                {
+                    lock(this)
+                    {
+                        string result = string.Empty;
+                        if (!isRecovering)
+                        {
+                            FreezedOperation freezedOp = new FreezedOperation();
+                            freezedOp.Index = GetFreezeOperationIndex();
+                            freezedOp.Operation = operation;
+                            freezedOp.Tid = TID;
+                            freezedOp.Uid = UID;
+                            freezedOp.Value = value;
+                            freezedOp.IsReleased = false;
+                            freezedOperations.Add(freezedOp);
+                            while (true)
+                            {
+                                if (freezedOperations.Exists(x => x.Index == freezedOp.Index && x.IsReleased))
+                                {
+                                    result = freezedOp.Result;
+                                    break;
+                                }
+                                else
+                                {
+                                    Monitor.Wait(this);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            result = "Server is recovering. Wait for a while";
+                        }
+                        return result;
+                    }
+                } 
+  
+  
+  
+               public void RecoverFreezedOperations()
+                {
+                    foreach (var operaion in freezedOperations)
+                    {
+                        Thread t;
+                        if (operaion.Operation == Constants.OPERATION_READ)
+                        {
+                            t = new Thread(new ParameterizedThreadStart(ReleaseRead));
+                            t.Start(operaion);
+
+                        }
+                        else if (operaion.Operation == Constants.OPERATION_WRITE)
+                        {
+                            t = new Thread(new ParameterizedThreadStart(ReleaseWrite));
+                            t.Start(operaion);
+                        }
+                    }            
+                }
+
+                public void ReleaseWrite(Object operation)
+                {
+                    FreezedOperation op = (FreezedOperation)operation;
+                    try
+                    {
+                        Write(op.Uid, op.Tid, op.Value);
+                        op.Result = "Write value "+op.Value+" by TID = " + op.Tid;
+                        op.IsReleased = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        op.Result = "Error writing value by TID = " + op.Tid + "Error is " + ex.Message;
+                        op.IsReleased = true;
+                    }
+                }
+
+                public void ReleaseRead(Object operation)
+                {
+                    FreezedOperation op = (FreezedOperation)operation;
+                    try
+                    {                
+                        int value = Read(op.Uid, op.Tid);
+                        op.Result="Read the value = "+value+" by TID = "+op.Tid;
+                        op.IsReleased = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        op.Result = "Error reading value by TID = "+op.Tid +"Error is "+ex.Message;
+                        op.IsReleased = true;
+                    }
+
+                }
+                */
+
+
         #endregion
 
         #region Private Members
@@ -306,7 +497,15 @@ namespace PADI_LIBRARY
             return uids;
 
         }
-
+        /*
+        private int GetFreezeOperationIndex()
+        {
+            lock(this)
+            {
+                return freezeOperationIndex++;
+            }
+        }
+        */
         #endregion
     }
 }

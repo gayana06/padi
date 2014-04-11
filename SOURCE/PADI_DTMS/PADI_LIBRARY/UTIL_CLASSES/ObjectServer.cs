@@ -45,6 +45,15 @@ namespace PADI_LIBRARY
             set { tcpUrl = value; }
         }
 
+        private bool isFreezed;
+
+        public bool IsFreezed
+        {
+            get { return isFreezed; }
+            set { isFreezed = value; }
+        }
+
+
         private int serverIndex;
 
         public int ServerIndex

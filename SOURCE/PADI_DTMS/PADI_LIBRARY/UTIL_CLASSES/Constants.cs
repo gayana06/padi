@@ -37,6 +37,9 @@ namespace PADI_LIBRARY
         public const string OBJECT_TYPE_PADI_COORDINATOR = "PADI_Coordinator";
         public const string OBJECT_TYPE_PADINT = "ServerPadInt";
 
+        public const string OPERATION_READ = "READ";
+        public const string OPERATION_WRITE = "WRITE";
+
         #endregion
     }
 }

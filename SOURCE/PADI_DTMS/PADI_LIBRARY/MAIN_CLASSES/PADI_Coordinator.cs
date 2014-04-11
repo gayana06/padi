@@ -37,6 +37,7 @@ namespace PADI_LIBRARY
         {
             bool finished = false;
             GenerateCommitRequests(tid, uidArray);
+            BlockIfAnyWorkerFreezed(tid);
             GatherCanCommitVotes(tid);
 
             if (transactionIdDict[tid].Exists(x => x.Vote == false))
@@ -71,6 +72,7 @@ namespace PADI_LIBRARY
         {           
             bool finished = false;
             GenerateCommitRequests(tid, uidArray);
+            BlockIfAnyWorkerFreezed(tid);
             TransactionDoAbort(tid);
             finished = CheckHasAborted(tid);            
             if (finished)
@@ -184,6 +186,43 @@ namespace PADI_LIBRARY
             }
         }
 
+        /// <summary>
+        /// This blocks if any of the worker servers contains a freezed server
+        /// </summary>
+        /// <param name="tid"></param>
+        private void BlockIfAnyWorkerFreezed(long tid)
+        {
+            lock (this)
+            {
+                while (true)
+                {
+                    bool hasFreezedServer = false;
+                    PADI_Worker worker;
+                    foreach (var commitR in transactionIdDict[tid])
+                    {
+                        worker=(PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(commitR.Server.ServerIp, commitR.Server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                        if (worker.IsThisServerFreezed)
+                        {
+                            hasFreezedServer = true;
+                            break;
+                        }
+                    }
+
+                    if (hasFreezedServer)
+                        Monitor.Wait(this);
+                    else
+                        break;
+                }
+            }
+        }
+
+        public void RecoverOperations()
+        {
+            lock (this)
+            {
+                Monitor.PulseAll(this);
+            }
+        }
         /// <summary>
         /// Gather can commit votes in Two phase commit
         /// </summary>
