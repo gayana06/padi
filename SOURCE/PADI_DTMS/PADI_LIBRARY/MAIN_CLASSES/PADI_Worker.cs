@@ -78,12 +78,18 @@ namespace PADI_LIBRARY
         /// <summary>
         /// Fail the server. This will stop sending heartbeats to master 
         /// </summary>
-        public void Fail()
+        public bool Fail()
         {
-            if (!isThisServerFailed)
+            lock (this)
             {
-                isThisServerFailed = true;
-                padIntActiveList.Clear();
+                bool canFail = false;
+                if (!isThisServerFailed && !isThisServerFreezed)
+                {
+                    isThisServerFailed = true;
+                    padIntActiveList.Clear();
+                    canFail = true;
+                }
+                return canFail;
             }
         }
 
@@ -323,7 +329,7 @@ namespace PADI_LIBRARY
         }
 
 
-        public void Freeze()
+        public bool Freeze()
         {
             /*
             lock (this)
@@ -336,19 +342,21 @@ namespace PADI_LIBRARY
                     isThisServerFreezed = true;
                 }
             }
-             */
-
+             */            
             lock (this)
-            {                
+            {
+                bool canFreeze = false;
                 if (!isThisServerFailed && !isThisServerFreezed)
                 {
                     isThisServerFreezed = true;
+                    canFreeze = true;
                 }
+                return canFreeze;
             }
-
+           
         }
 
-        public void Recover()
+        public bool Recover()
         {
             /* 
             isRecovering = true;
@@ -359,17 +367,21 @@ namespace PADI_LIBRARY
              */
             lock (this)
             {
+                bool hasRecovered = false;
                 if (isThisServerFreezed)
                 {
                     Monitor.PulseAll(this);
                     isThisServerFreezed = false;
+                    hasRecovered = true;
                 }
                 else if (isThisServerFailed)
                 {
                     BootstrapMaster(thisServer.ServerPort);
                     Console.WriteLine("Recovered failed server");
                     isThisServerFailed = false;
+                    hasRecovered = true;
                 }
+                return hasRecovered;
             }
             
         }

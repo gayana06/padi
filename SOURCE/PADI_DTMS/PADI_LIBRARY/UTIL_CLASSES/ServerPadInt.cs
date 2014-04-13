@@ -166,7 +166,7 @@ namespace PADI_LIBRARY
                     }
                     else
                     {
-                        throw new TxException("No committed version exists to read. UID = "+this.Uid+" ,TID = "+TID);                        
+                        throw new TxException("No committed version exists to read or later TID has already committed. UID = "+this.Uid+" ,TID = "+TID);                        
                     }
                 }
                 Console.WriteLine("---------------Read (END, TID=" + TID + ")-------------------\n");           

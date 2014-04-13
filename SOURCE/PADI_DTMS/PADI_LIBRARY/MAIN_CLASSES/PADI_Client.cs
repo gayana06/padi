@@ -291,21 +291,18 @@ namespace PADI_LIBRARY
         public static bool Fail(string url)
         {
             //TODO: this method makes the server at the URL stop responding to external calls except for a Recover call
-           // workerChannel = new TcpChannel(25052);
             info.ObjectServerMap = master.WorkerServerList.ToArray();
             foreach (var server in info.ObjectServerMap)
             {
                 if (server.TcpUrl == url)
                 {
                     PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), url);
-                    worker.Fail();
+                    bool isFailed= worker.Fail();
                     Console.WriteLine("Wait until master detects failure");
-                    Thread.Sleep(13000);
-                    Console.WriteLine("Server Failed; server url: {0}, server name: {1}", server.TcpUrl, server.ServerName);
+                    Thread.Sleep(17000);
+                    Console.WriteLine("Server Failed, Status "+isFailed+"; server url: {0}, server name: {1}", server.TcpUrl, server.ServerName);
                     break;
                 }
-                else
-                    Console.WriteLine("OOps the specified server could not be located!");
             }
             return true;
         }
@@ -321,9 +318,9 @@ namespace PADI_LIBRARY
             //TODO: this method makes the server at URL stop responding to external calls but it maintains all calls for later reply, as if the communication to that server were
             //only delayed.
             PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker),url);
-            worker.Freeze();
-            Console.WriteLine("Server Freezed");
-            return true;
+            bool isFreezed=worker.Freeze();
+            Console.WriteLine("Server Freezed. Status = "+isFreezed);
+            return isFreezed;
         }
 
         /// <summary>
@@ -335,12 +332,9 @@ namespace PADI_LIBRARY
         {
             //TODO: recover the Freeze and Fail.
             PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), url);
-            worker.Recover();
+            bool hasRecoveredServer= worker.Recover();
             coordinator.RecoverOperations();
-
-
-
-            Console.WriteLine("Server recovered");
+            Console.WriteLine("Server recovered, Status = "+hasRecoveredServer);
 
 
 

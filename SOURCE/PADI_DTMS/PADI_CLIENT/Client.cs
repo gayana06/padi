@@ -20,9 +20,12 @@ namespace PADI_CLIENT
         private const string READ = "RD";
         private const string WRITE = "WT";
         private const string STATUS_DUMP = "STD";
+        private const string FREEZE = "FZ";
+        private const string FAIL = "FL";
+        private const string RECOVER = "REC";
         private const char SEP_CHAR_COMMA = ',';
         private const string SEP_STR_COMMA = ",";
-        private const char SEP_CHAR_COLON = ':';
+        private const char SEP_CHAR_HYPHEN = '-';
         private const string SEP_STR_COLON = ":";
         
 
@@ -40,7 +43,7 @@ namespace PADI_CLIENT
             {
                 for (int i = 0; i < Int32.Parse(ConfigurationManager.AppSettings[APP_SET_SLEEP_TIME]); i++)
                 {
-                    Console.WriteLine("starts : " + (10 - i));
+                    Console.WriteLine("Starts : " + (Int32.Parse(ConfigurationManager.AppSettings[APP_SET_SLEEP_TIME]) - i));
                     Thread.Sleep(1000);
                 }
                 operationArray = ConfigurationManager.AppSettings[APP_SET_TASK].Split(SEP_CHAR_COMMA);
@@ -48,7 +51,7 @@ namespace PADI_CLIENT
                 PadInt padInt = null;
                 foreach (var operation in operationArray)
                 {
-                    tmp = operation.Split(SEP_CHAR_COLON);
+                    tmp = operation.Split(SEP_CHAR_HYPHEN);
                     bool status = false;
                     switch (tmp[0])
                     {
@@ -85,20 +88,37 @@ namespace PADI_CLIENT
                             PADI_Client.Status();
                             Console.WriteLine("Dumped Status");
                             break;
+                        case FREEZE:
+                            PADI_Client.Freeze(tmp[1]);
+                            break;
+                        case FAIL:
+                            PADI_Client.Fail(tmp[1]);
+                            break;
+                        case RECOVER:
+                            PADI_Client.Recover(tmp[1]);
+                            Thread.Sleep(5000); //wait until it stables
+                            break;
+                        default:
+                            Console.WriteLine("Invalid input");
+                            break;
                     }
                 }
-
             }
             catch (TxException ex)
             {
                 Console.WriteLine(ex.Message);
+                Console.WriteLine("Transaction aborted : " + PADI_Client.TxAbort());
+                PADI_Client.Status();
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
+                Console.WriteLine("Transaction aborted : " + PADI_Client.TxAbort());
+                PADI_Client.TxAbort();
             }
             finally
             {
+                Console.WriteLine("-----------Client execution ended----------");
                 Console.ReadLine();
             }
 
