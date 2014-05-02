@@ -15,12 +15,12 @@ namespace PADI_LIBRARY
     {
         #region Initialization
 
-        ObjectServer thisServer;         
+        ObjectServer thisServer;
         private ObjectServer[] objectServerList;
-        private Dictionary<int,ServerPadInt> padIntActiveList;
-       // private List<FreezedOperation> freezedOperations;
-       // private int freezeOperationIndex;
-       // bool isRecovering;
+        private Dictionary<int, ServerPadInt> padIntActiveList;
+        // private List<FreezedOperation> freezedOperations;
+        // private int freezeOperationIndex;
+        // bool isRecovering;
         bool isThisServerFreezed;
         bool isThisServerFailed;
 
@@ -28,11 +28,11 @@ namespace PADI_LIBRARY
         {
             get { return isThisServerFreezed; }
             set { isThisServerFreezed = value; }
-        } 
+        }
 
         public PADI_Worker()
         {
-            padIntActiveList = new Dictionary<int,ServerPadInt>();
+            padIntActiveList = new Dictionary<int, ServerPadInt>();
         }
 
         #endregion
@@ -108,9 +108,68 @@ namespace PADI_LIBRARY
         /// <param name="objectServerList"></param>
         public void ReceiveObjectServerList(ObjectServer[] objectServerList)
         {
-            this.objectServerList=objectServerList;
+            this.objectServerList = objectServerList;
             Console.WriteLine("New Object Server List received");
-            Common.Logger().LogInfo("New Object Server List received",string.Empty,string.Empty);
+            Common.Logger().LogInfo("New Object Server List received", string.Empty, string.Empty);
+        }
+        /// <summary>
+        /// Set the ReplicaServerNames after every leave and join
+        /// </summary>
+        /// <param name="objectServerList"></param>
+        public void PrintReplicaServerName(ObjectServer[] objectServerList)
+        {
+            this.objectServerList = objectServerList;
+            int noOfServers = objectServerList.Count();
+           // Array.Sort(objectServerList, (s1, s2) => s1.ServerName.CompareTo(s2.ServerName));
+            for (int j = 0; j < noOfServers; j++)
+            {
+                    Console.WriteLine("My ReplicaServerName is Mrs. " + objectServerList[j].ReplicaServerName);
+            }
+        }
+
+        /// <summary>
+        /// Get the padints to be replicated after a successful commit
+        /// </summary>
+        /// <param name="uidArray"></param>
+        /// <returns></returns>
+        public Dictionary<int, ServerPadInt> GetReplicaPadints(int[] uidArray)
+        {
+
+            Console.WriteLine("Starting the data Replication...");
+            Console.WriteLine("This are the Uids to be replicated! ");
+            Dictionary<int, ServerPadInt> replicaPadints = new Dictionary<int, ServerPadInt>();
+            replicaPadints.Clear();
+            Dictionary<int, ServerPadInt> tempPadIntActiveList = new Dictionary<int, ServerPadInt>(padIntActiveList);
+            foreach (var val in tempPadIntActiveList)
+            {
+                for (int i = 0; i < uidArray.Length; i++)
+                {
+                    if (val.Key == i)
+                    {
+                        Console.WriteLine("Added Uid: " + val.Key + " To replicaPadints");
+                        replicaPadints.Add(val.Key, val.Value);
+                    }
+                }
+            }
+            return replicaPadints;
+        }
+        /// <summary>
+        /// Connect the replica and update the results
+        /// </summary>
+        /// <param name="replicaPadints"></param>
+        public void UpdateReplica(Dictionary<int, ServerPadInt> replicaPadints)
+        {
+            //Dictionary<int, ServerPadInt> tempPadIntActiveList = new Dictionary<int, ServerPadInt>(padIntActiveList);
+            foreach (var valReplica in replicaPadints)
+            {
+                if (!padIntActiveList.ContainsKey(valReplica.Key)) //add if it doesnot exist
+                    padIntActiveList.Add(valReplica.Key, valReplica.Value);
+                else
+                {
+                    padIntActiveList[valReplica.Key] = valReplica.Value; //else update the value
+                }
+            }
+            Console.WriteLine("Successfully updated the replicas!");
         }
 
         /// <summary>
@@ -123,7 +182,7 @@ namespace PADI_LIBRARY
         {
             try
             {
-                int result=padIntActiveList[uid].Read(TID);
+                int result = padIntActiveList[uid].Read(TID);
                 lock (this)
                 {
                     if (isThisServerFreezed)
@@ -144,7 +203,7 @@ namespace PADI_LIBRARY
         /// <param name="TID"></param>
         /// <param name="value"></param>
         public void Write(int uid, long TID, int value)
-        {            
+        {
             bool isWriteSuccessful = padIntActiveList[uid].Write(TID, value);
             lock (this)
             {
@@ -197,7 +256,7 @@ namespace PADI_LIBRARY
             return isAccessed;
 
         }
-        
+
         /// <summary>
         /// Check posibility of commit for the requests of Coordiator.
         /// If no UID related to TID is not in tentative this return true.
@@ -267,7 +326,7 @@ namespace PADI_LIBRARY
             Dictionary<int, ServerPadInt> tempPadIntActiveList = new Dictionary<int, ServerPadInt>(padIntActiveList);
             foreach (var val in tempPadIntActiveList)
             {
-                Console.WriteLine("\nUid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited+", TID = "+val.Value.WriteTS);
+                Console.WriteLine("\nUid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited + ", TID = " + val.Value.WriteTS);
                 Console.WriteLine("\nReaders of this UID");
                 if (val.Value.ReadTSList.Count > 0)
                 {
@@ -342,7 +401,7 @@ namespace PADI_LIBRARY
                     isThisServerFreezed = true;
                 }
             }
-             */            
+             */
             lock (this)
             {
                 bool canFreeze = false;
@@ -353,7 +412,7 @@ namespace PADI_LIBRARY
                 }
                 return canFreeze;
             }
-           
+
         }
 
         public bool Recover()
@@ -383,7 +442,7 @@ namespace PADI_LIBRARY
                 }
                 return hasRecovered;
             }
-            
+
         }
 
         /*   Freeze old
@@ -507,7 +566,6 @@ namespace PADI_LIBRARY
                     uids.Add(item.Key);
             }
             return uids;
-
         }
         /*
         private int GetFreezeOperationIndex()

@@ -17,17 +17,17 @@ namespace PADI_CLIENT
             Common.Logger().LogInfo("Client started",string.Empty,string.Empty);
            // ClientForm f = new ClientForm();
            // Application.Run(f);
-            Client c = new Client();
-            c.Start();
+           // Client c = new Client();
+          //  c.Start();
 
-            /*   try
+               try
                {
                    bool res;
               
                    PADI_Client.Init();
-                   res = PADI_Client.Fail("tcp://127.0.0.1:25051/PADI_Worker");
-                   res = PADI_Client.Recover("tcp://127.0.0.1:25051/PADI_Worker");
-                   Thread.Sleep(5000);
+                  // res = PADI_Client.Fail("tcp://127.0.0.1:25051/PADI_Worker");
+                  // res = PADI_Client.Recover("tcp://127.0.0.1:25051/PADI_Worker");
+                  // Thread.Sleep(5000);
 
                    res = PADI_Client.TxBegin();
                    PadInt pi_a = PADI_Client.CreatePadInt(0);
@@ -35,8 +35,9 @@ namespace PADI_CLIENT
                     pi_a.Write(33);
                     pi_b.Write(34);
                    res = PADI_Client.TxCommit();
+                   PADI_Client.Status();
 
-                   res = PADI_Client.TxBegin();
+                 /*  res = PADI_Client.TxBegin();
                    PADI_Client.Freeze("tcp://localhost:25051/PADI_Worker");
                    pi_a = PADI_Client.AccessPadInt(0);
                    pi_b = PADI_Client.AccessPadInt(1);
@@ -50,8 +51,8 @@ namespace PADI_CLIENT
                    // res = PADI_Client.Freeze("tcp://localhost:25052/PADI_Worker");
                    // res = PADI_Client.Recover("tcp://localhost:25052/PADI_Worker");
                
-                   res = PADI_Client.TxCommit();
-                   PADI_Client.Status();
+                   res = PADI_Client.TxCommit();*/
+                  
                 
                }
                catch (TxException ex)
@@ -62,15 +63,15 @@ namespace PADI_CLIENT
                }
                catch (Exception ex)
                {
-                   Console.WriteLine(ex.Message);
-                   Console.WriteLine("Transaction aborted : " + PADI_Client.TxAbort());
-                   PADI_Client.TxAbort();
+                  // Console.WriteLine(ex.Message);
+                   //Console.WriteLine("Transaction aborted : " + PADI_Client.TxAbort());
+                  // PADI_Client.TxAbort();
                }
                finally
                {
                    Console.WriteLine("-----------Client execution ended----------");
                    Console.ReadLine();
-               }*/
+               }
         }
     }
 }

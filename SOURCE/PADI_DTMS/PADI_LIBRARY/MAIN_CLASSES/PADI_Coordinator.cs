@@ -15,6 +15,7 @@ namespace PADI_LIBRARY
         #region Initialization
 
         PADI_Master master;
+        List<ObjectServer> objectServerList;
         Dictionary<long, List<OperationRequestStatus>> transactionIdDict;
 
         public PADI_Coordinator(PADI_Master master)
@@ -49,6 +50,23 @@ namespace PADI_LIBRARY
                 TransactionDoCommit(tid);
                 finished = CheckHasCommitted(tid);
                 //TODO: After everyone commits update the replicas
+                PADI_Worker replica;
+                PADI_Worker worker;
+                string replicaServerName;
+                ObjectServer myReplica;
+                Dictionary<int, ServerPadInt> replicaPadints = new Dictionary<int,ServerPadInt>();
+                objectServerList = master.WorkerServerList;
+                foreach (var commitR in transactionIdDict[tid])
+                {
+                    replicaServerName = commitR.Server.ReplicaServerName;
+                    myReplica = objectServerList.SingleOrDefault(item => item.ServerName == replicaServerName);
+                    worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(commitR.Server.ServerIp, commitR.Server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                    replicaPadints = worker.GetReplicaPadints(uidArray);
+                    replica = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(myReplica.ServerIp, myReplica.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                    replica.UpdateReplica(replicaPadints);
+                    replicaPadints.Clear();
+                }
+
                 if (finished)
                 {
                     transactionIdDict.Remove(tid);

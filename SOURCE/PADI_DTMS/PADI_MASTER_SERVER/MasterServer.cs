@@ -51,7 +51,7 @@ namespace PADI_MASTER_SERVER
                 failDetectorTimer = new System.Threading.Timer(master.DetectObjectServerFailure, null, long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_OBJ_SERVER_FAIL_DECTOR_FREQUENCY]), long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_OBJ_SERVER_FAIL_DECTOR_FREQUENCY]));
 
                 Console.WriteLine("Master server started at port : " + masterPort);
-                Common.Logger().LogInfo("Worker server started", "Port : " + masterPort, string.Empty);
+                Common.Logger().LogInfo("Master server started", "Port : " + masterPort, string.Empty);
                 Console.ReadLine();
             }
             catch (Exception ex)

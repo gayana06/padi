@@ -10,7 +10,7 @@ namespace PADI_MASTER_SERVER
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Master Strated");
+            Console.WriteLine("Master Started");
             Common.Logger().LogInfo("Master started", string.Empty, string.Empty);
             MasterServer master = new MasterServer(); 
             Console.WriteLine("Master stopped");

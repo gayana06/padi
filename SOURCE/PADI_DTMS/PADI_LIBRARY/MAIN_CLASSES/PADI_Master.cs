@@ -91,6 +91,22 @@ namespace PADI_LIBRARY
             }
         }
 
+        public void UpdateReplicaServerNames()
+        {
+            for (int i = 0; i < WorkerServerList.Count; i++)
+            {
+                WorkerServerList[i].ServerIndex = ++i;
+            }
+            for (int j = 0; j < WorkerServerList.Count; j++)
+            {
+                if (workerServerList[j].ServerIndex == workerServerList.Count)
+                    workerServerList[j].ReplicaServerName = workerServerList[0].ServerName;
+                else
+                    WorkerServerList[j].ReplicaServerName = WorkerServerList[j + 1].ServerName;
+            }
+        }
+        
+
         /// <summary>
         /// When object servers ping periodically, this method is called
         /// </summary>
@@ -117,6 +133,7 @@ namespace PADI_LIBRARY
             }
         }
 
+       
         /// <summary>
         /// Ask object servers to dump the status to their consoles
         /// </summary>
@@ -149,20 +166,22 @@ namespace PADI_LIBRARY
                     if (HasNotification)
                     {
                         PADI_Worker worker;
-                        foreach (var server in WorkerServerList)
-                        {
-                            try
+                        UpdateReplicaServerNames();
+                            foreach (var server in WorkerServerList)
                             {
-                                worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(server.ServerIp, server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
-                                worker.ReceiveObjectServerList(WorkerServerList.ToArray());
+                                try
+                                {
+                                    worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(server.ServerIp, server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                                    worker.ReceiveObjectServerList(WorkerServerList.ToArray());
+                                    worker.PrintReplicaServerName(WorkerServerList.ToArray());
+                                }
+                                catch (Exception ex)
+                                {
+                                    //TODO: implement a retry mechanism if failed later if required. 
+                                    Console.WriteLine(ex.Message);
+                                    Common.Logger().LogError(ex.Message, "NotifyObjectServer() in PADI_MASTER", string.Empty);
+                                }
                             }
-                            catch (Exception ex)
-                            {
-                                //TODO: implement a retry mechanism if failed later if required. 
-                                Console.WriteLine(ex.Message);
-                                Common.Logger().LogError(ex.Message, "NotifyObjectServer() in PADI_MASTER", string.Empty);
-                            }
-                        }
                         HasNotification = false;
                     }
                     else

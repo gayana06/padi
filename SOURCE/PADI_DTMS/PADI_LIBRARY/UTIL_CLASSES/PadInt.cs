@@ -30,7 +30,7 @@ namespace PADI_LIBRARY
             set { worker = value; }
         }
 
-        PADI_Client client;
+       // PADI_Client client;
 
         public PadInt(int uID)
         {
