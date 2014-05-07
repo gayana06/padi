@@ -18,6 +18,7 @@ namespace PADI_LIBRARY
         ObjectServer thisServer;
         private ObjectServer[] objectServerList;
         private Dictionary<int, ServerPadInt> padIntActiveList;
+        private Dictionary<int, ServerPadInt> padIntReplicaList;
         // private List<FreezedOperation> freezedOperations;
         // private int freezeOperationIndex;
         // bool isRecovering;
@@ -33,6 +34,7 @@ namespace PADI_LIBRARY
         public PADI_Worker()
         {
             padIntActiveList = new Dictionary<int, ServerPadInt>();
+            padIntReplicaList = new Dictionary<int, ServerPadInt>();
         }
 
         #endregion
@@ -144,7 +146,7 @@ namespace PADI_LIBRARY
             {
                 for (int i = 0; i < uidArray.Length; i++)
                 {
-                    if (val.Key == i)
+                    if (val.Key == uidArray[i])
                     {
                         Console.WriteLine("Added Uid: " + val.Key + " To replicaPadints");
                         replicaPadints.Add(val.Key, val.Value);
@@ -159,14 +161,14 @@ namespace PADI_LIBRARY
         /// <param name="replicaPadints"></param>
         public void UpdateReplica(Dictionary<int, ServerPadInt> replicaPadints)
         {
-            //Dictionary<int, ServerPadInt> tempPadIntActiveList = new Dictionary<int, ServerPadInt>(padIntActiveList);
+            
             foreach (var valReplica in replicaPadints)
             {
-                if (!padIntActiveList.ContainsKey(valReplica.Key)) //add if it doesnot exist
-                    padIntActiveList.Add(valReplica.Key, valReplica.Value);
+                if (!padIntReplicaList.ContainsKey(valReplica.Key)) //add if it doesnot exist
+                    padIntReplicaList.Add(valReplica.Key, valReplica.Value);
                 else
                 {
-                    padIntActiveList[valReplica.Key] = valReplica.Value; //else update the value
+                    padIntReplicaList[valReplica.Key] = valReplica.Value; //else update the value
                 }
             }
             Console.WriteLine("Successfully updated the replicas!");
@@ -324,6 +326,8 @@ namespace PADI_LIBRARY
         {
             Console.WriteLine("\n---------------------Server Status (Start)------------------------");
             Dictionary<int, ServerPadInt> tempPadIntActiveList = new Dictionary<int, ServerPadInt>(padIntActiveList);
+            Dictionary<int, ServerPadInt> tempPadIntReplicaList = new Dictionary<int, ServerPadInt>(padIntReplicaList);
+            Console.WriteLine("\n---------------------Active PadInt Status (Start)------------------------");
             foreach (var val in tempPadIntActiveList)
             {
                 Console.WriteLine("\nUid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited + ", TID = " + val.Value.WriteTS);
@@ -354,6 +358,39 @@ namespace PADI_LIBRARY
                 }
                 Console.WriteLine("\n");
             }
+            Console.WriteLine("\n---------------------Active PadInt Status (End)------------------------");
+            Console.WriteLine("\n---------------------Replica PadInt Status (Start)------------------------");
+            foreach (var val in tempPadIntReplicaList)
+            {
+                Console.WriteLine("\nUid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited + ", TID = " + val.Value.WriteTS);
+                Console.WriteLine("\nReaders of this UID");
+                if (val.Value.ReadTSList.Count > 0)
+                {
+                    foreach (var reader in val.Value.ReadTSList)
+                    {
+                        Console.WriteLine("TID = " + reader);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No transaction has read this UID");
+                }
+
+                Console.WriteLine("\nTentative writes of this UID");
+                if (val.Value.TentativeList.Count > 0)
+                {
+                    foreach (var tentative in val.Value.TentativeList)
+                    {
+                        Console.WriteLine("Tentative TID = " + tentative.WriteTS + " Value = " + tentative.Value);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No tentative writes for this UID");
+                }
+                Console.WriteLine("\n");
+            }
+            Console.WriteLine("---------------------Replica PadInt Status (END)------------------------");
             Console.WriteLine("---------------------Server Status (END)------------------------\n");
 
         }
