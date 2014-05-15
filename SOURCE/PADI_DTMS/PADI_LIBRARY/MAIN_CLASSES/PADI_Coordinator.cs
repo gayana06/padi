@@ -54,7 +54,7 @@ namespace PADI_LIBRARY
                 PADI_Worker worker;
                 string replicaServerName;
                 ObjectServer myReplica;
-                Dictionary<int, ServerPadInt> replicaPadints = new Dictionary<int,ServerPadInt>();
+                Dictionary<int, ServerPadInt> replicaPadints = new Dictionary<int, ServerPadInt>();
                 objectServerList = master.WorkerServerList;
                 foreach (var commitR in transactionIdDict[tid])
                 {
@@ -66,7 +66,6 @@ namespace PADI_LIBRARY
                     replica.UpdateReplica(replicaPadints);
                     replicaPadints.Clear();
                 }
-
                 if (finished)
                 {
                     transactionIdDict.Remove(tid);
@@ -241,6 +240,7 @@ namespace PADI_LIBRARY
                 Monitor.PulseAll(this);
             }
         }
+
         /// <summary>
         /// Gather can commit votes in Two phase commit
         /// </summary>

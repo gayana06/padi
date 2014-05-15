@@ -78,6 +78,45 @@ namespace PADI_LIBRARY
         }
 
         /// <summary>
+        /// Redistribute the PadIntActiveList to the new group
+        /// </summary>
+        /// <param name="state"></param>
+        public void Shuffle()
+        {
+            Dictionary<ObjectServer,List<int>> shuffList = 
+                new Dictionary<ObjectServer, List<int>>();
+
+            foreach (var obj in padIntActiveList)
+            {
+                if (!shuffList.ContainsKey(objectServerList[obj.Key % objectServerList.Count()]))
+                {
+                    List<int> uids = new List<int>();
+                    uids.Add(obj.Key);
+                    shuffList.Add(objectServerList[obj.Key % objectServerList.Count()], uids);
+                }
+                else
+                {
+                    shuffList[objectServerList[obj.Key % objectServerList.Count()]].Add(obj.Key);
+                }
+            }
+
+            foreach (var server in shuffList.Keys)
+            {
+                Dictionary<int, ServerPadInt> shuff = new Dictionary<int,ServerPadInt>;
+                PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker),
+                    Common.GenerateTcpUrl(server.ReplicaServerName, server.ServerPort, 
+                    Constants.OBJECT_TYPE_PADI_WORKER));
+
+                foreach (var obj in shuffList[server])
+                {
+                    shuff.Add(obj, padIntActiveList[obj]);
+                }
+                //TODO: shuff list may be passing references instead of values
+                worker.UpdateObjects(shuff);
+            }
+        }
+
+        /// <summary>
         /// Fail the server. This will stop sending heartbeats to master 
         /// </summary>
         public bool Fail()
@@ -108,12 +147,13 @@ namespace PADI_LIBRARY
         /// Receive the new object server map from server when object server join or left
         /// </summary>
         /// <param name="objectServerList"></param>
-        public void ReceiveObjectServerList(ObjectServer[] objectServerList)
+        public void UpdateServerList(ObjectServer[] objectServerList)
         {
             this.objectServerList = objectServerList;
             Console.WriteLine("New Object Server List received");
             Common.Logger().LogInfo("New Object Server List received", string.Empty, string.Empty);
         }
+
         /// <summary>
         /// Set the ReplicaServerNames after every leave and join
         /// </summary>
@@ -155,13 +195,13 @@ namespace PADI_LIBRARY
             }
             return replicaPadints;
         }
+      
         /// <summary>
-        /// Connect the replica and update the results
+        /// Update the list of replicated (padInt) objects
         /// </summary>
         /// <param name="replicaPadints"></param>
         public void UpdateReplica(Dictionary<int, ServerPadInt> replicaPadints)
         {
-            
             foreach (var valReplica in replicaPadints)
             {
                 if (!padIntReplicaList.ContainsKey(valReplica.Key)) //add if it doesnot exist
@@ -172,6 +212,24 @@ namespace PADI_LIBRARY
                 }
             }
             Console.WriteLine("Successfully updated the replicas!");
+        }
+
+        /// <summary>
+        /// Update the padIntActiveList as part of the reshuffling procedure
+        /// </summary>
+        /// <param name="PadInts"></param>
+        public void UpdateObjects(Dictionary<int, ServerPadInt> PadInts)
+        {
+            foreach (var obj in PadInts)
+            {
+                if (!padIntActiveList.ContainsKey(obj.Key))
+                    padIntActiveList.Add(obj.Key, obj.Value);
+                else
+                {
+                    padIntActiveList[obj.Key] = obj.Value;
+                }
+            }
+            Console.WriteLine("Successfully *reshuffled* the active objects objects!");
         }
 
         /// <summary>
@@ -423,7 +481,6 @@ namespace PADI_LIBRARY
 
             return isAborted;
         }
-
 
         public bool Freeze()
         {

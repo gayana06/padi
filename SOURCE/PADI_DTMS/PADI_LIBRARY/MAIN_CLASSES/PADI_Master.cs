@@ -21,6 +21,7 @@ namespace PADI_LIBRARY
         private List<ObjectServer> workerServerList;
         private Dictionary<string, DateTime> objectServerHeartBeatTimeStamp;
         private long latestWorkerServerViewTimeStamp = 0;
+        private bool groupMembershipChange = false;
 
         public long LatestWorkerServerViewTimeStamp
         {
@@ -106,7 +107,6 @@ namespace PADI_LIBRARY
             }
         }
         
-
         /// <summary>
         /// When object servers ping periodically, this method is called
         /// </summary>
@@ -132,7 +132,6 @@ namespace PADI_LIBRARY
                 }
             }
         }
-
        
         /// <summary>
         /// Ask object servers to dump the status to their consoles
@@ -171,8 +170,10 @@ namespace PADI_LIBRARY
                             {
                                 try
                                 {
-                                    worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(server.ServerIp, server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
-                                    worker.ReceiveObjectServerList(WorkerServerList.ToArray());
+                                    worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), 
+                                        Common.GenerateTcpUrl(server.ServerIp, server.ServerPort, 
+                                        Constants.OBJECT_TYPE_PADI_WORKER));
+                                    worker.UpdateServerList(WorkerServerList.ToArray());
                                     worker.PrintReplicaServerName(WorkerServerList.ToArray());
                                 }
                                 catch (Exception ex)
