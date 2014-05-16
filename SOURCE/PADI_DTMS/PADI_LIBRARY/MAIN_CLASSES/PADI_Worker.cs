@@ -88,7 +88,8 @@ namespace PADI_LIBRARY
 
             foreach (var obj in padIntActiveList)
             {
-                if (!shuffList.ContainsKey(objectServerList[obj.Key % objectServerList.Count()]))
+                if (!shuffList.ContainsKey(objectServerList[obj.Key % objectServerList.Count()]) 
+                    && objectServerList[obj.Key % objectServerList.Count()] != thisServer)
                 {
                     List<int> uids = new List<int>();
                     uids.Add(obj.Key);
@@ -102,14 +103,16 @@ namespace PADI_LIBRARY
 
             foreach (var server in shuffList.Keys)
             {
-                Dictionary<int, ServerPadInt> shuff = new Dictionary<int,ServerPadInt>;
+                Dictionary<int, ServerPadInt> shuff = new Dictionary<int,ServerPadInt>();
                 PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker),
                     Common.GenerateTcpUrl(server.ReplicaServerName, server.ServerPort, 
                     Constants.OBJECT_TYPE_PADI_WORKER));
 
+                //populate temp list and clean the redundant
                 foreach (var obj in shuffList[server])
                 {
                     shuff.Add(obj, padIntActiveList[obj]);
+                    padIntActiveList.Remove(obj);
                 }
                 //TODO: shuff list may be passing references instead of values
                 worker.UpdateObjects(shuff);
