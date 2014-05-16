@@ -187,6 +187,8 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public static bool TxBegin()
         {
+            if (!master.getViewStatus())
+                return false;
             bool trancationEstablished = false;
             //NOte: Clear padIntUids. This is only required if multiple transactions are checked in a single machine.
             padIntUids.Clear();

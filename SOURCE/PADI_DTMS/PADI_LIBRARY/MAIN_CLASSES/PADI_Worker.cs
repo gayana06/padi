@@ -155,6 +155,8 @@ namespace PADI_LIBRARY
             this.objectServerList = objectServerList;
             Console.WriteLine("New Object Server List received");
             Common.Logger().LogInfo("New Object Server List received", string.Empty, string.Empty);
+            Shuffle();
+            Console.WriteLine("Shuffling objects completed!");
         }
 
         /// <summary>

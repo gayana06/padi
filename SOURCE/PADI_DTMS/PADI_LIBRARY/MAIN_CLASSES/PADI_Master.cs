@@ -41,7 +41,7 @@ namespace PADI_LIBRARY
             set { objectServerHeartBeatTimeStamp = value; }
         }
 
-        public bool HasNotification
+        public bool ViewUpdating
         {
             get { return hasNotification; }
             set { hasNotification = value; }
@@ -154,15 +154,16 @@ namespace PADI_LIBRARY
         }
         
         /// <summary>
-        /// If any new server arrived this method should notify all the object servers.
+        /// Handling group membership updates (aka view synchrony)
+        /// If any new server arrived this method sequentially notifies the object servers.
         /// </summary>
-        public void NotifyObjectServer()
+        public void ViewChangeHandler()
         {
             lock (this)
             {
                 while (true)
                 {
-                    if (HasNotification)
+                    if (ViewUpdating)
                     {
                         PADI_Worker worker;
                         UpdateReplicaServerNames();
@@ -183,7 +184,7 @@ namespace PADI_LIBRARY
                                     Common.Logger().LogError(ex.Message, "NotifyObjectServer() in PADI_MASTER", string.Empty);
                                 }
                             }
-                        HasNotification = false;
+                        ViewUpdating = false;
                     }
                     else
                     {
@@ -219,6 +220,11 @@ namespace PADI_LIBRARY
                     workerServerList.Remove(Common.GetObjectServerByName(failedServer,workerServerList));
                 }
             }
+        }
+
+        public bool getViewStatus()
+        {
+            return ViewUpdating;
         }
 
         #endregion
