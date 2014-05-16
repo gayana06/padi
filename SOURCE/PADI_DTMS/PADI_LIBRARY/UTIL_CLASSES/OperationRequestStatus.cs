@@ -44,6 +44,14 @@ namespace PADI_LIBRARY
             set { hasAborted = value; }
         }
 
+        private Dictionary<int, ServerPadInt> replicaSet;
+
+        public Dictionary<int, ServerPadInt> ReplicaSet
+        {
+            get { return replicaSet; }
+            set { replicaSet = value; }
+        }
+
         #endregion
     }
 }

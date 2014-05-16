@@ -187,24 +187,30 @@ namespace PADI_LIBRARY
         /// <returns></returns>
         public static bool TxBegin()
         {
-            if (!master.getViewStatus())
-                return false;
             bool trancationEstablished = false;
             //NOte: Clear padIntUids. This is only required if multiple transactions are checked in a single machine.
             padIntUids.Clear();
             try
             {
                 string tidReply = coordinator.BeginTxn();
-                Console.WriteLine("Coordinator reply : " + tidReply);
-                string[] tempSep = tidReply.Split(Constants.SEP_CHAR_COLON);
-                long receivedTimeStamp = long.Parse(tempSep[1]);
-                if (receivedTimeStamp != info.AvailableMasterMapTimeStamp)
+                if (!String.IsNullOrEmpty(tidReply))
                 {
-                    info.AvailableMasterMapTimeStamp = receivedTimeStamp;
-                    LoadServerMap();
+                    Console.WriteLine("Coordinator reply : " + tidReply);
+                    string[] tempSep = tidReply.Split(Constants.SEP_CHAR_COLON);
+                    long receivedTimeStamp = long.Parse(tempSep[1]);
+                    if (receivedTimeStamp != info.AvailableMasterMapTimeStamp)
+                    {
+                        info.AvailableMasterMapTimeStamp = receivedTimeStamp;
+                        LoadServerMap();
+                    }
+                    TransactionId = long.Parse(tempSep[0]);
+                    trancationEstablished = true;
                 }
-                TransactionId = long.Parse(tempSep[0]);
-                trancationEstablished = true;
+                else
+                {
+                    TransactionId = 0;
+                    Console.WriteLine("Server stabilizing in progress, try later.");
+                }
             }
             catch (Exception ex)
             {
@@ -231,18 +237,25 @@ namespace PADI_LIBRARY
         public static bool TxCommit()
         {
             bool isCommited = false;
-            int[] uidArray = padIntUids.ToArray();
-            if (HasAnyServerFreezed(uidArray))
-            {
-                AsyncOperation commit = new AsyncOperation(coordinator.Commit);
-                AsyncCallback commitCallback = new AsyncCallback(AsyncCommitCallBack);
-                IAsyncResult RemAr = commit.BeginInvoke(TransactionId, uidArray, commitCallback, null);
-                Console.WriteLine("Commit delays due to the freezed server.");
+            if (TransactionId > 0)
+            {                
+                int[] uidArray = padIntUids.ToArray();
+                if (HasAnyServerFreezed(uidArray))
+                {
+                    AsyncOperation commit = new AsyncOperation(coordinator.Commit);
+                    AsyncCallback commitCallback = new AsyncCallback(AsyncCommitCallBack);
+                    IAsyncResult RemAr = commit.BeginInvoke(TransactionId, uidArray, commitCallback, null);
+                    Console.WriteLine("Commit delays due to the freezed server.");
+                }
+                else
+                {
+                    isCommited = coordinator.Commit(TransactionId, uidArray);
+                    Console.WriteLine("Transaction commit status is " + isCommited);
+                }
             }
             else
             {
-                isCommited = coordinator.Commit(TransactionId, uidArray);
-                Console.WriteLine("Transaction commit status is " + isCommited);                
+                Console.WriteLine("Server stabilization in progress");
             }
             return isCommited;
         }
@@ -257,24 +270,31 @@ namespace PADI_LIBRARY
             bool isAborted = false;
             try
             {
-                if (padIntUids.Count() > 0)
+                if (TransactionId > 0)
                 {
-                    int[] uidArray = padIntUids.ToArray();
-                    if (HasAnyServerFreezed(uidArray))
+                    if (padIntUids.Count() > 0)
                     {
-                        AsyncOperation abort = new AsyncOperation(coordinator.AbortTxn);
-                        AsyncCallback abortCallback = new AsyncCallback(AsyncAbortCallBack);
-                        IAsyncResult RemAr = abort.BeginInvoke(TransactionId, uidArray, abortCallback, null);
-                        Console.WriteLine("Abort delays due to the freezed server.");
+                        int[] uidArray = padIntUids.ToArray();
+                        if (HasAnyServerFreezed(uidArray))
+                        {
+                            AsyncOperation abort = new AsyncOperation(coordinator.AbortTxn);
+                            AsyncCallback abortCallback = new AsyncCallback(AsyncAbortCallBack);
+                            IAsyncResult RemAr = abort.BeginInvoke(TransactionId, uidArray, abortCallback, null);
+                            Console.WriteLine("Abort delays due to the freezed server.");
+                        }
+                        else
+                        {
+                            isAborted = coordinator.AbortTxn(TransactionId, uidArray);
+                        }
                     }
                     else
                     {
-                        isAborted = coordinator.AbortTxn(TransactionId, uidArray);
+                        Console.WriteLine("No UID has been manipulated to abort.");
                     }
                 }
                 else
                 {
-                    Console.WriteLine("No UID has been manipulated to abort.");
+                    Console.WriteLine("Server stabilization in progress");
                 }
             }
             catch (Exception ex)
@@ -293,20 +313,20 @@ namespace PADI_LIBRARY
         public static bool Fail(string url)
         {
             //TODO: this method makes the server at the URL stop responding to external calls except for a Recover call
-            info.ObjectServerMap = master.WorkerServerList.ToArray();
-            foreach (var server in info.ObjectServerMap)
+            bool hasFailed = false;
+            try
             {
-                if (server.TcpUrl == url)
-                {
-                    PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), url);
-                    bool isFailed= worker.Fail();
-                    Console.WriteLine("Wait until master detects failure");
-                    Thread.Sleep(17000);
-                    Console.WriteLine("Server Failed, Status "+isFailed+"; server url: {0}, server name: {1}", server.TcpUrl, server.ServerName);
-                    break;
-                }
+                PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), url);
+                hasFailed = worker.Fail();
+                Console.WriteLine("Wait until master detects failure");
+                Thread.Sleep(17000);
+                Console.WriteLine("Server Failed, Status " + hasFailed);
             }
-            return true;
+            catch (Exception ex)
+            {
+                Console.WriteLine("Source : at Client.Fail.."+ex.Message);
+            }
+            return hasFailed;
         }
 
         /// <summary>

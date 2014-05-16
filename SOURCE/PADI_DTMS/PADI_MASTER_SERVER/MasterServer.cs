@@ -43,6 +43,7 @@ namespace PADI_MASTER_SERVER
                 masterChannel = new TcpChannel(props, null, provider);
                 master = new PADI_Master();
                 coordinator = new PADI_Coordinator(master);
+                master.Coordinator = coordinator;
                 ChannelServices.RegisterChannel(masterChannel, false);
                 RemotingServices.Marshal(master, Constants.OBJECT_TYPE_PADI_MASTER, typeof(PADI_Master));
                 RemotingServices.Marshal(coordinator,Constants.OBJECT_TYPE_PADI_COORDINATOR,typeof(PADI_Coordinator));

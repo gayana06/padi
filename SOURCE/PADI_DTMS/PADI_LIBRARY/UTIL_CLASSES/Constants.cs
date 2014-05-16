@@ -30,6 +30,7 @@ namespace PADI_LIBRARY
         public const string APPSET_HEARTBEAT_PERIOD = "HEARTBEAT_PERIOD";
         public const string APPSET_OBJ_SERVER_FAIL_DECTOR_FREQUENCY = "OBJ_SERVER_FAIL_DECTOR_FREQUENCY";
         public const string APPSET_OBJ_SERVER_FAIL_TIME = "OBJ_SERVER_FAIL_TIME";
+        public const string APPSET_TIMEOUT_PERIOD = "TIMEOUT_PERIOD";
 
         public const string OBJECT_TYPE_PADI_WORKER = "PADI_Worker";
         public const string OBJECT_TYPE_PADI_MASTER = "PADI_Master";

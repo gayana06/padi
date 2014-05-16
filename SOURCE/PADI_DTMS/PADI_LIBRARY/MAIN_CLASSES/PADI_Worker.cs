@@ -16,14 +16,17 @@ namespace PADI_LIBRARY
         #region Initialization
 
         ObjectServer thisServer;
+        ObjectServer replicaServer;
         private ObjectServer[] objectServerList;
         private Dictionary<int, ServerPadInt> padIntActiveList;
         private Dictionary<int, ServerPadInt> padIntReplicaList;
+        private Dictionary<int, ServerPadInt> padIntShuffelList;
         // private List<FreezedOperation> freezedOperations;
         // private int freezeOperationIndex;
         // bool isRecovering;
         bool isThisServerFreezed;
         bool isThisServerFailed;
+        bool isShufflingActive;
 
         public bool IsThisServerFreezed
         {
@@ -78,48 +81,6 @@ namespace PADI_LIBRARY
         }
 
         /// <summary>
-        /// Redistribute the PadIntActiveList to the new group
-        /// </summary>
-        /// <param name="state"></param>
-        public void Shuffle()
-        {
-            Dictionary<ObjectServer,List<int>> shuffList = 
-                new Dictionary<ObjectServer, List<int>>();
-
-            foreach (var obj in padIntActiveList)
-            {
-                if (!shuffList.ContainsKey(objectServerList[obj.Key % objectServerList.Count()]) 
-                    && objectServerList[obj.Key % objectServerList.Count()] != thisServer)
-                {
-                    List<int> uids = new List<int>();
-                    uids.Add(obj.Key);
-                    shuffList.Add(objectServerList[obj.Key % objectServerList.Count()], uids);
-                }
-                else
-                {
-                    shuffList[objectServerList[obj.Key % objectServerList.Count()]].Add(obj.Key);
-                }
-            }
-
-            foreach (var server in shuffList.Keys)
-            {
-                Dictionary<int, ServerPadInt> shuff = new Dictionary<int,ServerPadInt>();
-                PADI_Worker worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker),
-                    Common.GenerateTcpUrl(server.ReplicaServerName, server.ServerPort, 
-                    Constants.OBJECT_TYPE_PADI_WORKER));
-
-                //populate temp list and clean the redundant
-                foreach (var obj in shuffList[server])
-                {
-                    shuff.Add(obj, padIntActiveList[obj]);
-                    padIntActiveList.Remove(obj);
-                }
-                //TODO: shuff list may be passing references instead of values
-                worker.UpdateObjects(shuff);
-            }
-        }
-
-        /// <summary>
         /// Fail the server. This will stop sending heartbeats to master 
         /// </summary>
         public bool Fail()
@@ -131,6 +92,7 @@ namespace PADI_LIBRARY
                 {
                     isThisServerFailed = true;
                     padIntActiveList.Clear();
+                    padIntReplicaList.Clear();
                     canFail = true;
                 }
                 return canFail;
@@ -153,25 +115,129 @@ namespace PADI_LIBRARY
         public void UpdateServerList(ObjectServer[] objectServerList)
         {
             this.objectServerList = objectServerList;
+            if (objectServerList != null)
+            {
+                thisServer = Common.GetObjectServerByName(thisServer.ServerName,objectServerList.ToList());
+                replicaServer = Common.GetObjectServerByName(thisServer.ReplicaServerName, objectServerList.ToList());
+            }
             Console.WriteLine("New Object Server List received");
+            Console.WriteLine("This server = " + thisServer.ServerName + " and replica = " + replicaServer.ServerName);
             Common.Logger().LogInfo("New Object Server List received", string.Empty, string.Empty);
-            Shuffle();
-            Console.WriteLine("Shuffling objects completed!");
         }
 
         /// <summary>
-        /// Set the ReplicaServerNames after every leave and join
+        /// Redistribute the PadIntActiveList to the new group
         /// </summary>
-        /// <param name="objectServerList"></param>
-        public void PrintReplicaServerName(ObjectServer[] objectServerList)
+        /// <returns></returns>
+        public bool Shuffle()
         {
-            this.objectServerList = objectServerList;
-            int noOfServers = objectServerList.Count();
-           // Array.Sort(objectServerList, (s1, s2) => s1.ServerName.CompareTo(s2.ServerName));
-            for (int j = 0; j < noOfServers; j++)
+            bool hasCompleted = false;
+            try
             {
-                    Console.WriteLine("My ReplicaServerName is Mrs. " + objectServerList[j].ReplicaServerName);
+                Dictionary<String, PADI_Worker> workerSet = new Dictionary<string, PADI_Worker>();
+                ProcessShuffle(workerSet, padIntActiveList);
+                ProcessShuffle(workerSet, padIntReplicaList);
+                hasCompleted=true;
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Shuffel failed. "+ex.Message);
+                Common.Logger().LogError(ex.Message, ex.StackTrace, ex.Source);
+            }
+            return hasCompleted;
+        }
+
+        /// <summary>
+        /// Redistribute the PadIntActiveList to the new group
+        /// </summary>
+        /// <param name="workerSet"></param>
+        /// <param name="dataset"></param>
+        private void ProcessShuffle(Dictionary<String, PADI_Worker> workerSet, Dictionary<int,ServerPadInt> dataset)
+        {
+            PADI_Worker workerRef;
+            ObjectServer worker;
+            foreach (var item in dataset)
+            {
+                int workerIndex = item.Key % objectServerList.Length;
+                worker = objectServerList[workerIndex];
+
+                if (worker.ServerName == thisServer.ServerName)
+                {
+                    AddShuffleData(item.Key, item.Value);
+                }
+                else
+                {
+                    if (!workerSet.ContainsKey(worker.ServerName))
+                    {
+                        workerRef = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(worker.ServerIp, worker.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                        workerSet.Add(worker.ServerName, workerRef);
+                    }
+                    else
+                    {
+                        workerRef = workerSet[worker.ServerName];
+                    }
+                    workerRef.AddShuffleData(item.Key, item.Value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Initiate the padIntShuffelList data structure
+        /// </summary>
+        /// <returns></returns>
+        public void WorkerReadyForShuffel()
+        {
+            isShufflingActive = true;
+            padIntShuffelList = new Dictionary<int, ServerPadInt>();
+        }
+
+        /// <summary>
+        /// Initiate the padIntShuffelList data structure
+        /// </summary>
+        /// <returns></returns>
+        public void WorkerReadyForReplicate()
+        {
+            padIntReplicaList = new Dictionary<int, ServerPadInt>();
+        }
+
+        //Replicate the full data structure
+        public bool DoReplicate()
+        {
+            bool hasReplicated = false;
+            PADI_Worker workerRef;
+            try
+            {
+                workerRef = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(replicaServer.ServerIp, replicaServer.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                workerRef.UpdateReplica(padIntActiveList);
+                hasReplicated = true;
+            }
+            catch (Exception ex)
+            {
+
+            }
+            return hasReplicated;
+        }
+
+
+        public void AddShuffleData(int key, ServerPadInt value)
+        {
+            if (value.IsCommited && !padIntShuffelList.ContainsKey(key))
+            {
+                ServerPadInt serverPadInt = new ServerPadInt(key,this,value.WriteTS,value.ReadTSList,value.TentativeList,value.IsCommited,value.Value);
+                padIntShuffelList.Add(key, serverPadInt);
+            }
+        }
+
+        /// <summary>
+        /// Copy shuffled data to the active padint data structure
+        /// </summary>
+        public void PersistShuffleData()
+        {
+            padIntActiveList=new Dictionary<int,ServerPadInt>(padIntShuffelList);
+            padIntShuffelList = null;
+            padIntReplicaList.Clear();
+            Console.WriteLine("Shuffled data persisted");
+            isShufflingActive = false;
         }
 
         /// <summary>
@@ -200,41 +266,26 @@ namespace PADI_LIBRARY
             }
             return replicaPadints;
         }
-      
+
         /// <summary>
-        /// Update the list of replicated (padInt) objects
+        /// Connect the replica and update the results
         /// </summary>
         /// <param name="replicaPadints"></param>
         public void UpdateReplica(Dictionary<int, ServerPadInt> replicaPadints)
         {
-            foreach (var valReplica in replicaPadints)
+            lock (this)
             {
-                if (!padIntReplicaList.ContainsKey(valReplica.Key)) //add if it doesnot exist
-                    padIntReplicaList.Add(valReplica.Key, valReplica.Value);
-                else
+                foreach (var replica in replicaPadints)
                 {
-                    padIntReplicaList[valReplica.Key] = valReplica.Value; //else update the value
+                    if (padIntReplicaList.ContainsKey(replica.Key))
+                    {
+                        padIntReplicaList.Remove(replica.Key);
+                    }
+                    ServerPadInt serverPadInt = new ServerPadInt(replica.Key, this, replica.Value.WriteTS, replica.Value.ReadTSList, replica.Value.TentativeList, replica.Value.IsCommited, replica.Value.Value);
+                    padIntReplicaList.Add(replica.Key, serverPadInt);
                 }
+                //Console.WriteLine("Successfully updated the replicas!");
             }
-            Console.WriteLine("Successfully updated the replicas!");
-        }
-
-        /// <summary>
-        /// Update the padIntActiveList as part of the reshuffling procedure
-        /// </summary>
-        /// <param name="PadInts"></param>
-        public void UpdateObjects(Dictionary<int, ServerPadInt> PadInts)
-        {
-            foreach (var obj in PadInts)
-            {
-                if (!padIntActiveList.ContainsKey(obj.Key))
-                    padIntActiveList.Add(obj.Key, obj.Value);
-                else
-                {
-                    padIntActiveList[obj.Key] = obj.Value;
-                }
-            }
-            Console.WriteLine("Successfully *reshuffled* the active objects objects!");
         }
 
         /// <summary>
@@ -277,9 +328,10 @@ namespace PADI_LIBRARY
             }
             if (!isWriteSuccessful)
             {
-                //TODO: Ask coordinator to abort the transaction TID
+                PADI_Coordinator coordinator = (PADI_Coordinator)Activator.GetObject(typeof(PADI_Coordinator), Common.GetCoordinatorTcpUrl());
+                coordinator.AbortTxn(TID);
                 Console.WriteLine("Write aborted TID=" + TID);
-                throw new TxException("Write aborted TID=" + TID);
+               // throw new TxException("Write aborted TID=" + TID);
             }
         }
 
@@ -357,7 +409,7 @@ namespace PADI_LIBRARY
         /// </summary>
         /// <param name="TID"></param>
         /// <returns></returns>
-        public bool DoCommit(long TID)
+        public bool DoCommit(long TID, ref Dictionary<int,ServerPadInt> replicaSet)
         {
             bool isCommited = false;
             List<int> uidsToCommit = GetUidsRelatedToTid(TID);
@@ -370,6 +422,7 @@ namespace PADI_LIBRARY
                     {
                         break;
                     }
+                    replicaSet.Add(uid, padIntActiveList[uid]);
                 }
             }
             else
@@ -377,7 +430,6 @@ namespace PADI_LIBRARY
                 return true;
             }
 
-            //TODO: abort the previously completed commits if any
             return isCommited;
 
         }
@@ -387,75 +439,101 @@ namespace PADI_LIBRARY
         /// </summary>
         public void DumpStatus()
         {
-            Console.WriteLine("\n---------------------Server Status (Start)------------------------");
-            Dictionary<int, ServerPadInt> tempPadIntActiveList = new Dictionary<int, ServerPadInt>(padIntActiveList);
-            Dictionary<int, ServerPadInt> tempPadIntReplicaList = new Dictionary<int, ServerPadInt>(padIntReplicaList);
-            Console.WriteLine("\n---------------------Active PadInt Status (Start)------------------------");
-            foreach (var val in tempPadIntActiveList)
+            try
             {
-                Console.WriteLine("\nUid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited + ", TID = " + val.Value.WriteTS);
-                Console.WriteLine("\nReaders of this UID");
-                if (val.Value.ReadTSList.Count > 0)
+                Console.WriteLine("\n---------------------Server Status (Start)------------------------");
+                Dictionary<int, ServerPadInt> tempPadIntActiveList = new Dictionary<int, ServerPadInt>(padIntActiveList);
+                Dictionary<int, ServerPadInt> tempPadIntReplicaList = new Dictionary<int, ServerPadInt>(padIntReplicaList);
+                Console.WriteLine("\n---------------------Active PadInt Status (Start) Server = "+thisServer.ServerName+" ------------------------");
+                foreach (var val in tempPadIntActiveList)
                 {
-                    foreach (var reader in val.Value.ReadTSList)
+                    Console.WriteLine("\nUid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited + ", TID = " + val.Value.WriteTS);
+                    Console.WriteLine("\nLatest 5 Readers of this UID");
+                    if (val.Value.ReadTSList.Count > 0)
                     {
-                        Console.WriteLine("TID = " + reader);
+                        if (val.Value.ReadTSList.Count > 5)
+                        {
+                            for (int i = (val.Value.ReadTSList.Count - 1); i > (val.Value.ReadTSList.Count - 6); i--)
+                            {
+                                Console.WriteLine("TID = " + val.Value.ReadTSList[i]);
+                            }
+                        }
+                        else
+                        {
+                            foreach (var reader in val.Value.ReadTSList)
+                            {
+                                Console.WriteLine("TID = " + reader);
+                            }
+                        }
                     }
-                }
-                else
-                {
-                    Console.WriteLine("No transaction has read this UID");
-                }
+                    else
+                    {
+                        Console.WriteLine("No transaction has read this UID");
+                    }
 
-                Console.WriteLine("\nTentative writes of this UID");
-                if (val.Value.TentativeList.Count > 0)
-                {
-                    foreach (var tentative in val.Value.TentativeList)
+                    Console.WriteLine("\nTentative writes of this UID");
+                    if (val.Value.TentativeList.Count > 0)
                     {
-                        Console.WriteLine("Tentative TID = " + tentative.WriteTS + " Value = " + tentative.Value);
+                        foreach (var tentative in val.Value.TentativeList)
+                        {
+                            Console.WriteLine("Tentative TID = " + tentative.WriteTS + " Value = " + tentative.Value);
+                        }
                     }
+                    else
+                    {
+                        Console.WriteLine("No tentative writes for this UID");
+                    }
+                    Console.WriteLine("\n");
                 }
-                else
+                Console.WriteLine("\n---------------------Active PadInt Status (End)------------------------");
+                Console.WriteLine("\n---------------------Replica PadInt Status (Start) Server = " + thisServer.ServerName + "------------------------");
+                foreach (var val in tempPadIntReplicaList)
                 {
-                    Console.WriteLine("No tentative writes for this UID");
+                    Console.WriteLine("\nUid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited + ", TID = " + val.Value.WriteTS);
+                    Console.WriteLine("\nLatest five Readers of this UID");
+                    if (val.Value.ReadTSList.Count > 0)
+                    {
+                        if (val.Value.ReadTSList.Count > 5)
+                        {
+                            for (int i = (val.Value.ReadTSList.Count - 1); i > (val.Value.ReadTSList.Count - 6); i--)
+                            {
+                                Console.WriteLine("TID = " + val.Value.ReadTSList[i]);
+                            }
+                        }
+                        else
+                        {
+                            foreach (var reader in val.Value.ReadTSList)
+                            {
+                                Console.WriteLine("TID = " + reader);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("No transaction has read this UID");
+                    }
+
+                    Console.WriteLine("\nTentative writes of this UID");
+                    if (val.Value.TentativeList.Count > 0)
+                    {
+                        foreach (var tentative in val.Value.TentativeList)
+                        {
+                            Console.WriteLine("Tentative TID = " + tentative.WriteTS + " Value = " + tentative.Value);
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("No tentative writes for this UID");
+                    }
+                    Console.WriteLine("\n");
                 }
-                Console.WriteLine("\n");
+                Console.WriteLine("---------------------Replica PadInt Status (END)------------------------");
+                Console.WriteLine("---------------------Server Status (END)------------------------\n");
             }
-            Console.WriteLine("\n---------------------Active PadInt Status (End)------------------------");
-            Console.WriteLine("\n---------------------Replica PadInt Status (Start)------------------------");
-            foreach (var val in tempPadIntReplicaList)
+            catch (Exception ex)
             {
-                Console.WriteLine("\nUid = " + val.Key + ", Value = " + val.Value.Value + ", Commited = " + val.Value.IsCommited + ", TID = " + val.Value.WriteTS);
-                Console.WriteLine("\nReaders of this UID");
-                if (val.Value.ReadTSList.Count > 0)
-                {
-                    foreach (var reader in val.Value.ReadTSList)
-                    {
-                        Console.WriteLine("TID = " + reader);
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("No transaction has read this UID");
-                }
-
-                Console.WriteLine("\nTentative writes of this UID");
-                if (val.Value.TentativeList.Count > 0)
-                {
-                    foreach (var tentative in val.Value.TentativeList)
-                    {
-                        Console.WriteLine("Tentative TID = " + tentative.WriteTS + " Value = " + tentative.Value);
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("No tentative writes for this UID");
-                }
-                Console.WriteLine("\n");
+                Console.WriteLine(ex.Message);
             }
-            Console.WriteLine("---------------------Replica PadInt Status (END)------------------------");
-            Console.WriteLine("---------------------Server Status (END)------------------------\n");
-
         }
 
         /// <summary>
@@ -473,10 +551,6 @@ namespace PADI_LIBRARY
                 foreach (var uid in uidsToAbort)
                 {
                     isAborted = padIntActiveList[uid].TxAbort(TID);
-                    if (!isAborted)
-                    {
-                        break;
-                    }
                 }
             }
             else
@@ -487,20 +561,9 @@ namespace PADI_LIBRARY
             return isAborted;
         }
 
+
         public bool Freeze()
         {
-            /*
-            lock (this)
-            {
-                if (!isThisServerFreezed)
-                {
-                    freezeOperationIndex = 0;
-                    isRecovering = false;
-                    freezedOperations = new List<FreezedOperation>();
-                    isThisServerFreezed = true;
-                }
-            }
-             */
             lock (this)
             {
                 bool canFreeze = false;
@@ -516,13 +579,6 @@ namespace PADI_LIBRARY
 
         public bool Recover()
         {
-            /* 
-            isRecovering = true;
-            RecoverFreezedOperations();
-            Monitor.PulseAll(this);
-            isRecovering = false;
-            isThisServerFreezed = false;
-             */
             lock (this)
             {
                 bool hasRecovered = false;
@@ -544,106 +600,37 @@ namespace PADI_LIBRARY
 
         }
 
-        /*   Freeze old
-        
-                 /// <summary>
-                /// Async method invoked by the clients when server is freezed
-                /// </summary>
-                /// <param name="operation"></param>
-                /// <param name="TID"></param>
-                /// <param name="UID"></param>
-                /// <param name="value"></param>
-                /// <returns></returns>
-                public string ReadWriteWhenFreeze(string operation, long TID, int UID, int value)
+        /// <summary>
+        /// Periodically runs and remove older tentitive rights to prvent deadlock
+        /// </summary>
+        public void TentativeWriteTimeOutMonitor(Object state)
+        {
+            try
+            {
+                if (!isThisServerFailed && !IsThisServerFreezed && !isShufflingActive)
                 {
-                    lock(this)
+                    PADI_Coordinator coordinator = (PADI_Coordinator)Activator.GetObject(typeof(PADI_Coordinator), Common.GetCoordinatorTcpUrl());
+                    long tid = 0;
+                    foreach (var item in padIntActiveList)
                     {
-                        string result = string.Empty;
-                        if (!isRecovering)
+                        if (item.Value.TentativeList.Count > 1)
                         {
-                            FreezedOperation freezedOp = new FreezedOperation();
-                            freezedOp.Index = GetFreezeOperationIndex();
-                            freezedOp.Operation = operation;
-                            freezedOp.Tid = TID;
-                            freezedOp.Uid = UID;
-                            freezedOp.Value = value;
-                            freezedOp.IsReleased = false;
-                            freezedOperations.Add(freezedOp);
-                            while (true)
+                            if (DateTime.Now.Subtract(item.Value.TentativeList[0].CreatedTimeStamp).Seconds > 3)
                             {
-                                if (freezedOperations.Exists(x => x.Index == freezedOp.Index && x.IsReleased))
-                                {
-                                    result = freezedOp.Result;
-                                    break;
-                                }
-                                else
-                                {
-                                    Monitor.Wait(this);
-                                }
+                                tid = item.Value.TentativeList[0].WriteTS;
+                                coordinator.AbortTxn(tid);
+                                item.Value.TentativeList[1].CreatedTimeStamp = DateTime.Now;
+                                Console.WriteLine("TentativeWriteTimeOutMonitor order abort to TID = "+tid);                                                           
                             }
                         }
-                        else
-                        {
-                            result = "Server is recovering. Wait for a while";
-                        }
-                        return result;
-                    }
-                } 
-  
-  
-  
-               public void RecoverFreezedOperations()
-                {
-                    foreach (var operaion in freezedOperations)
-                    {
-                        Thread t;
-                        if (operaion.Operation == Constants.OPERATION_READ)
-                        {
-                            t = new Thread(new ParameterizedThreadStart(ReleaseRead));
-                            t.Start(operaion);
-
-                        }
-                        else if (operaion.Operation == Constants.OPERATION_WRITE)
-                        {
-                            t = new Thread(new ParameterizedThreadStart(ReleaseWrite));
-                            t.Start(operaion);
-                        }
-                    }            
-                }
-
-                public void ReleaseWrite(Object operation)
-                {
-                    FreezedOperation op = (FreezedOperation)operation;
-                    try
-                    {
-                        Write(op.Uid, op.Tid, op.Value);
-                        op.Result = "Write value "+op.Value+" by TID = " + op.Tid;
-                        op.IsReleased = true;
-                    }
-                    catch (Exception ex)
-                    {
-                        op.Result = "Error writing value by TID = " + op.Tid + "Error is " + ex.Message;
-                        op.IsReleased = true;
                     }
                 }
-
-                public void ReleaseRead(Object operation)
-                {
-                    FreezedOperation op = (FreezedOperation)operation;
-                    try
-                    {                
-                        int value = Read(op.Uid, op.Tid);
-                        op.Result="Read the value = "+value+" by TID = "+op.Tid;
-                        op.IsReleased = true;
-                    }
-                    catch (Exception ex)
-                    {
-                        op.Result = "Error reading value by TID = "+op.Tid +"Error is "+ex.Message;
-                        op.IsReleased = true;
-                    }
-
-                }
-                */
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("TentativeWriteTimeOutMonitor :"+ex.Message);
+            }
+        }
 
 
         #endregion
@@ -666,15 +653,7 @@ namespace PADI_LIBRARY
             }
             return uids;
         }
-        /*
-        private int GetFreezeOperationIndex()
-        {
-            lock(this)
-            {
-                return freezeOperationIndex++;
-            }
-        }
-        */
+        
         #endregion
     }
 }

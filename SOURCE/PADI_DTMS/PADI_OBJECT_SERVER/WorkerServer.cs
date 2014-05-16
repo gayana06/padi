@@ -31,6 +31,7 @@ namespace PADI_OBJECT_SERVER
         public void StartWorkerServer()
         {
             System.Threading.Timer timer = null;
+            System.Threading.Timer tentativeWriteMonitorTimer = null;
             try
             {
 
@@ -45,6 +46,7 @@ namespace PADI_OBJECT_SERVER
                 RemotingServices.Marshal(worker, Constants.OBJECT_TYPE_PADI_WORKER, typeof(PADI_Worker));
                 bool isBootStraped = worker.BootstrapMaster(workerPort);
                 timer = new System.Threading.Timer(worker.SendHeartBeatMessage, null, long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_HEARTBEAT_PERIOD]), long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_HEARTBEAT_PERIOD]));
+                tentativeWriteMonitorTimer = new System.Threading.Timer(worker.TentativeWriteTimeOutMonitor, null, long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_TIMEOUT_PERIOD]), long.Parse(ConfigurationManager.AppSettings[Constants.APPSET_TIMEOUT_PERIOD]));
                 Console.ReadLine();
 
             }

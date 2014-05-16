@@ -25,6 +25,17 @@ namespace PADI_LIBRARY
             IsCommited = false;
         }
 
+        public ServerPadInt(int uid, PADI_Worker worker, long writeTS, List<long> readTSList, List<TentativePadInt> tentativeList, bool isCommitted, int value)
+        {
+            this.uid = uid;
+            this.WriteTS = writeTS;
+            this.ReadTSList = new List<long>(readTSList);
+            this.TentativeList = new List<TentativePadInt>(tentativeList);
+            this.worker = worker;
+            this.IsCommited = isCommitted;
+            this.Value = value;
+        }
+
         PADI_Worker worker;
 
         private int uid;
@@ -84,7 +95,7 @@ namespace PADI_LIBRARY
         /// </summary>
         /// <returns></returns>
         public object Clone()
-        {
+        {            
             return this.MemberwiseClone();
         }
 
@@ -212,7 +223,7 @@ namespace PADI_LIBRARY
                     {
                         if (TentativeList.Exists(x => x.WriteTS < TID))
                         {
-                            Console.WriteLine("Waiting at cancommit TID = "+TID+ " ,UID="+this.Uid);
+                            Console.WriteLine("Waiting at can commit TID = "+TID+ " ,UID="+this.Uid);
                             Monitor.Wait(this);
                         }
                         else
