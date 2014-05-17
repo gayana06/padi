@@ -58,6 +58,19 @@ namespace PADI_LIBRARY
         }
 
         /// <summary>
+        /// Generate Coordinator TCP url
+        /// </summary>
+        /// <returns></returns>
+        public static string GetCoordinatorTcpUrl()
+        {
+            string ip = ConfigurationManager.AppSettings[Constants.APPSET_MASTER_IP];
+            string port = ConfigurationManager.AppSettings[Constants.APPSET_MASTER_PORT];
+            string objectName = Constants.OBJECT_TYPE_PADI_COORDINATOR;
+            return GenerateTcpUrl(ip, port, objectName);
+        }
+
+
+        /// <summary>
         /// Get the index of the serverlist provided where the UID belongs
         /// </summary>
         /// <param name="uid"></param>

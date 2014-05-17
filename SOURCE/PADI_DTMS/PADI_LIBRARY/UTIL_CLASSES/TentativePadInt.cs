@@ -18,6 +18,7 @@ namespace PADI_LIBRARY
         {
             this.WriteTS=writeTS;
             this.Value=value;
+            CreatedTimeStamp = DateTime.Now;
         }
 
         private long writeTS;
@@ -34,6 +35,14 @@ namespace PADI_LIBRARY
         {
             get { return this.value; }
             set { this.value = value; }
+        }
+
+        private DateTime createdTimeStamp;
+
+        public DateTime CreatedTimeStamp
+        {
+            get { return createdTimeStamp; }
+            set { createdTimeStamp = value; }
         }
 
         #endregion

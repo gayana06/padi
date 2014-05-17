@@ -15,12 +15,28 @@ namespace PADI_LIBRARY
     {
         #region Initialization
 
+        private PADI_Coordinator coordinator;
         private int serverIndex = 0;
         private bool hasNotification = false;
         private const string PREFIX_WORKER_SERVER = "W_SERVER_";
         private List<ObjectServer> workerServerList;
         private Dictionary<string, DateTime> objectServerHeartBeatTimeStamp;
         private long latestWorkerServerViewTimeStamp = 0;
+        System.Threading.Timer shuffleTimer = null;
+        System.Threading.Timer pendingTidMonitorTimer = null;
+        bool hasPendingTransactions;
+
+        public PADI_Coordinator Coordinator
+        {
+            get { return coordinator; }
+            set { coordinator = value; }
+        }
+
+        public bool HasPendingTransactions
+        {
+            get { return hasPendingTransactions; }
+            set { hasPendingTransactions = value; }
+        }
 
         public long LatestWorkerServerViewTimeStamp
         {
@@ -40,7 +56,7 @@ namespace PADI_LIBRARY
             set { objectServerHeartBeatTimeStamp = value; }
         }
 
-        public bool HasNotification
+        public bool ViewUpdating
         {
             get { return hasNotification; }
             set { hasNotification = value; }
@@ -80,22 +96,19 @@ namespace PADI_LIBRARY
                 wserver.ServerIp = ip;
                 wserver.ServerPort = port;
                 wserver.TcpUrl = Common.GenerateTcpUrl(ip, port, Constants.OBJECT_TYPE_PADI_WORKER);
-                wserver.ServerIndex = serverIndex;
-                //TODO:  set replicaServerName : This should be calculated by a function which will consider the position of the record in the workerServerList
-
+                wserver.ServerIndex = serverIndex;                
                 workerServerList.Add(wserver);
-                hasNotification = true;
-                LatestWorkerServerViewTimeStamp = DateTime.Now.Ticks;
-                Monitor.PulseAll(this);
+                Stabilizer();
                 return wserver;
             }
         }
 
         public void UpdateReplicaServerNames()
         {
+            int index = 0;
             for (int i = 0; i < WorkerServerList.Count; i++)
             {
-                WorkerServerList[i].ServerIndex = ++i;
+                WorkerServerList[i].ServerIndex = ++index;
             }
             for (int j = 0; j < WorkerServerList.Count; j++)
             {
@@ -157,32 +170,31 @@ namespace PADI_LIBRARY
         /// <summary>
         /// If any new server arrived this method should notify all the object servers.
         /// </summary>
-        public void NotifyObjectServer()
+        public void ViewChangeHandler()
         {
             lock (this)
             {
                 while (true)
                 {
-                    if (HasNotification)
+                    if (ViewUpdating)
                     {
                         PADI_Worker worker;
-                        UpdateReplicaServerNames();
-                            foreach (var server in WorkerServerList)
+                        foreach (var server in WorkerServerList)
+                        {
+                            try
                             {
-                                try
-                                {
-                                    worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(server.ServerIp, server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
-                                    worker.ReceiveObjectServerList(WorkerServerList.ToArray());
-                                    worker.PrintReplicaServerName(WorkerServerList.ToArray());
-                                }
-                                catch (Exception ex)
-                                {
-                                    //TODO: implement a retry mechanism if failed later if required. 
-                                    Console.WriteLine(ex.Message);
-                                    Common.Logger().LogError(ex.Message, "NotifyObjectServer() in PADI_MASTER", string.Empty);
-                                }
+                                worker = (PADI_Worker)Activator.GetObject(typeof(PADI_Worker), Common.GenerateTcpUrl(server.ServerIp, server.ServerPort, Constants.OBJECT_TYPE_PADI_WORKER));
+                                worker.UpdateServerList(WorkerServerList.ToArray());                                
                             }
-                        HasNotification = false;
+                            catch (Exception ex)
+                            {
+                                //TODO: implement a retry mechanism if failed later if required. 
+                                Console.WriteLine(ex.Message);
+                                Common.Logger().LogError(ex.Message, "ViewChangeHandler() in PADI_MASTER", string.Empty);
+                            }
+                        }
+                        coordinator.UpdateObjectServerList(WorkerServerList);
+                        ViewUpdating = false;
                     }
                     else
                     {
@@ -204,8 +216,7 @@ namespace PADI_LIBRARY
                 foreach (var timeStamp in ObjectServerHeartBeatTimeStamp)
                 {
                     if ((DateTime.Now.Subtract(timeStamp.Value).Seconds) * 1000 > int.Parse(ConfigurationManager.AppSettings[Constants.APPSET_OBJ_SERVER_FAIL_TIME]))
-                    {
-                        //TODO: failure detected what to do now
+                    {                        
                         failedServer = timeStamp.Key;
                         Console.WriteLine("Failure detected server :" + timeStamp.Key);
                         Common.Logger().LogInfo("Failure detected server :" + timeStamp.Key, string.Empty, string.Empty);
@@ -213,13 +224,114 @@ namespace PADI_LIBRARY
                     }
                 }
                 if (!String.IsNullOrEmpty(failedServer))
-                {
+                {                    
                     ObjectServerHeartBeatTimeStamp.Remove(failedServer);
-                    workerServerList.Remove(Common.GetObjectServerByName(failedServer,workerServerList));
+                    workerServerList.Remove(Common.GetObjectServerByName(failedServer,workerServerList));                    
+                    Stabilizer();
+
                 }
             }
         }
 
+        /// <summary>
+        /// Stabilize the system once new worker enter or leave
+        /// </summary>
+        private void Stabilizer()
+        {
+            HaltOrStartTransactionIssuing(true);
+            pendingTidMonitorTimer = new System.Threading.Timer(MonitorPendingTransactions, null, 500, 500);               
+        }
+
+        private void HaltOrStartTransactionIssuing(bool isHalt)
+        {           
+            if (isHalt)
+                Coordinator.MonitorPendingTransactionsBeforeStabilize();
+            else
+                Coordinator.StartTransactions();
+        }
+
+        private void MonitorPendingTransactions(Object state)
+        {
+            lock (this)
+            {
+                if (!HasPendingTransactions)
+                {
+                    pendingTidMonitorTimer.Dispose();
+                    Console.WriteLine("Ready for shuffle and replication");
+                    UpdateReplicaServerNames();
+                    ViewUpdating = true;
+                    LatestWorkerServerViewTimeStamp = DateTime.Now.Ticks;
+                    Monitor.PulseAll(this);
+                    shuffleTimer = new System.Threading.Timer(ContinueStabilizer, null, 1000, 3000);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Continue stabilizing after new view is broadcast to the current workers
+        /// </summary>
+        /// <param name="state"></param>
+        private void ContinueStabilizer(Object state)
+        {
+            if (!ViewUpdating)
+            {
+                shuffleTimer.Dispose();
+                StartShuffleAndReplicate();
+                HaltOrStartTransactionIssuing(false);
+                DumpObjectServerStatus();
+            }
+        }
+
+        /// <summary>
+        /// Manage shuffling and replication of padints
+        /// </summary>
+        private void StartShuffleAndReplicate()
+        {
+            PADI_Worker server;
+            Dictionary<String, PADI_Worker> workerSet = new Dictionary<string, PADI_Worker>();
+            foreach (var worker in WorkerServerList)
+            {
+                server=(PADI_Worker)Activator.GetObject(typeof(PADI_Worker),Common.GenerateTcpUrl(worker.ServerIp,worker.ServerPort,Constants.OBJECT_TYPE_PADI_WORKER));
+                workerSet.Add(worker.ServerName, server);
+                server.WorkerReadyForShuffel();                
+            }
+
+            foreach (var worker in WorkerServerList)
+            {
+                bool hasShuffeled = workerSet[worker.ServerName].Shuffle();
+                if(hasShuffeled)
+                    Console.WriteLine("Worker "+worker.ServerName+" has completed shuffeling data");
+                else
+                    Console.WriteLine("Worker " + worker.ServerName + " has failed shuffeling data");
+            }
+
+            foreach (var worker in WorkerServerList)
+            {
+                workerSet[worker.ServerName].PersistShuffleData();
+            }
+
+            foreach (var worker in WorkerServerList)
+            {
+                workerSet[worker.ServerName].WorkerReadyForReplicate();
+            }
+
+            if (workerServerList.Count > 1)
+            {
+                foreach (var worker in WorkerServerList)
+                {
+                    bool hasReplicated = workerSet[worker.ServerName].DoReplicate();
+                    if (hasReplicated)
+                        Console.WriteLine("Worker " + worker.ServerName + " has completed replicating data");
+                    else
+                        Console.WriteLine("Worker " + worker.ServerName + " has failed replicating data");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Only one worker server available. No replication ocuured.");
+            }
+            Console.WriteLine("Worker servers stabilized.");
+        }
         #endregion
     }
 }
