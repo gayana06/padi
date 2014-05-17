@@ -31,22 +31,21 @@
 \thispagestyle{empty}
 
 \begin{abstract}
-   The present paper describes the details of a distributed software
-   transactional memory implementation.
-   Solutions for 2 scenarios are presented: \\
-   a) perfect links and processes \\
-   b) fault-tolerant environment with replication \\
+   The present report describes the implementation details of a fault-tolerant,
+   replicated, distributed software transactional memory.
 \end{abstract}
 
 %------------------------------------------------------------------------- 
 \Section{Introduction}
-Due to the cloud computing revolution in computing, today’s world has increasingly moved to cloud-based services rather than maintaining their own infrastructure. The cloud service providers are well equipped with the hardware and software infrastructure to provide better services by applying concepts of {\it Distributed Computing}. 
+Due to the cloud computing revolution in computing, 
+today’s world has increasingly moved to cloud-based services rather than maintaining their 
+own infrastructure. The cloud service providers are well equipped with the hardware and
+ software infrastructure to provide better services by applying concepts of {\it Distributed Computing}. 
 
-In this model of computing, one of the main problems that providers face is concurrent transactions; how the system behaves when multiple users access/manipulates an object at the same time; how to maintain the proper order of commit and how to resolve conflicting operations. This paper addresses such issues in detail and suggests possible solutions for implementation.
-
-In the following sections the implementation of a distributed software transactional memory library is presented for two scenarios: \\
-a) perfect Master, Servers and links \\
-b) perfect Master, links and recoverable, sequentially 
+In this model of computing, one of the main problems that providers face is concurrent transactions;
+ how the system behaves when multiple users access/manipulate an object at the same time; how to maintain 
+the proper order of commit and how to resolve conflicting operations. 
+The paper describes the solution for handling transactions in a replicated, fault-tolernt, distributed system. 
 
 Section \ref{sec:arch} introduces an overview of each scenario. Section 
 \ref{sec:algor} discusses the algorithms used for concurrency control, 
@@ -57,51 +56,68 @@ transaction management and Client-Server communication
 \Section{Architecture}
 \label{sec:arch}
 
-The assumption made for all the sections below is that the Master is a perfect process. The names Object Servers and Servers are used interchangeably and refer to any non-Master and non-Client process that participates in a transaction.
-The main differences/similarities between the two architectures, perfect and fault-tolerant, are the following:
-\begin{itemize}[noitemsep,nolistsep]
-\item for perfect, the Coordinator of a transaction can be any Server, not necessarily the Master
-\item in the fault-tolerant scenario, replication of tentative objects and transactions is assured
-\item the Master also acts as a failure detector in both scenarios 
-\item the Master and the Coordinator are the same process in the fault-tolerant scenario
-\end{itemize}
+The assumption made for all the sections below is that the Master is a perfect process. 
+The names Object Servers and Servers are used interchangeably and refer to any non-Master and non-Client process
+ that participates in a transaction.
+The Master also acts as the{\it Coordinator} for handling transactions and {\it Replica Manager} for eagerly replicating
+objects among the Object Servers. The main assumption is that the Master does not fail, only Object Servers do.
 
-Subsection \ref{subsec:perf} details the perfect architecture, while Subsection \ref{subsec:ftsys} lists the details of the fault-tolerant architecture. Further details on the reponsibilities of the Coordinator/Master are in Subsection \ref{subsec:respon}.
+Subsection \ref{subsec:repl} details the replication steps when a commit occurs, Subsection \ref{subsec:grmemb} lists the details of redistribution of objects among servers after a node fails or joins. Further details on the reponsibilities of the Coordinator/Master are in Subsection \ref{subsec:respon}.
 %------------------------------------------------------------------------- 
-\SubSection{Perfect links and processes}
-\label{subsec:perf}
+\SubSection{Replication}
+\label{subsec:repl}
 As illustrated in Figure \ref{fig:perf}, the Master server {\it(M)} is used by the Object Servers {\it(S)} when bootstrapping. Information such as
 IP address and port number of the Server is stored by the Master which, then, issues unique identifiers for each Server. Once the Object Server (S) has been issued an identifier and notified the Master of joining the group of available servers, it can be connected by Clients {\it(C)} for handling transactions. Transaction identifiers (TID) should be unique to the whole system therefore the Master server (M) will keep track of the global sequence of TIDs.
 
 \begin{figure}
 \centering
-\includegraphics[scale=0.3]{perfect.eps}
-\caption{Master, Server and Client entities in a perfect setup}
-\label{fig:perf}
+\includegraphics[scale=0.3]{replication.eps}
+\caption{RM: Replication Manager; S: Object Server; R: Replica Server}
+\label{fig:repl}
 \end{figure}
 
-Note: the number of Object Servers can vary.
-
-Clients (C) will query the Master (M) if the their cached list of servers is outdated or attempting to reach an Object Server (S) times out. The Master (M) provides the Client an updated list of the available Object Servers (S) to be used for establishing/handling transactions.
-
-Objects that are going to be stored in Object Servers (S) have unique identifiers (integer) so that each object can be uniquely identified throughout the system. Therefore in this solution we are using the modulo function against the number of Object Servers (S) available in order to find the actual location of the object to be stored or referred.
-
-The clients (C) can connect to multiple Object Servers inside a single transaction, hence it is required to have a Coordinator that manages the transaction operations such as commit and abort.
-The Coordinator can be any Server from the list provided by the Master in the current, perfect, scenario. On the other hand, in the fault-tolerant scenario, we consider the Master (M) as the coordinator. When a Client (C) needs to manipulate an object it connect to the relevant Object Server, which will contact the Coordinator (M) and join the transaction. Then the manipulation operations (Read/Write) are handled only by the Client and the Object Servers (S).
+When the Coordinator (depicted as the Replica Manager in Figure \ref{fig:repl}) receives a
+\texttt{Commit} call along with the Transaction ID, and the list of UIDs, it is calling 
+the workers' \texttt{GetReplicaPadInts} to retrieve a dictionary of PadInt objects which is used
+to call the replica's \texttt{UpdateReplica} method. Once the replication is completed, the Coordinator
+returns from the transaction and notifies the client of the commit's result (True or False).
+%TODO: David add more details if you feel like
 
 %------------------------------------------------------------------------- 
-\SubSection{Fault Tolerant system}
-\label{subsec:ftsys}
-For recoverability in case of failure, an extension to the above system is necessary. Having a replication of the transaction's objects in a particular Object Server (S) across other Servers (S) is necessary to assure recoverability. The Master (M) handles the replica location of each Server. Our proposal for the replica locations is a conceptual ring, where S1's replica is stored in S2, and that of S2 in S3, etc. The Master notifies each Server of its replica location. The transaction modal is similar to the phase one, the only extension required is to ask the replica server as well to join the coordinator for the transaction.
+\SubSection{Group Membership Change}
+\label{subsec:grmemb}
+Since the Master server also assumes the role of a Failure Detector - refer to Figure \ref{fig:heart},
+ upon observing a node failure, it updates its list of available workers and pushes it to the workers.
+ The workers, upon receiving the list initiate the \it{redistribution} of objects procedure. 
 
-The Master server (M) also assumes the role of a {\it failure detector}, by using the heartbeat messages regularly exchanged between the Master and the Server. In case of an Object Server(S) failure, the Master server(M) will identify it through heartbeats and issue a notification to all the other Object Servers (S) about the failure. No further TIDs are issued for the clients until the failure recovered. Once the current transactions complete, the Master will stabilise the system with the correct replica locations.
+\begin{figure}
+\centering
+\includegraphics[scale=0.3]{heartbeat.eps}
+\caption{Periodic heartbeats sent to the Coordinator}
+\label{fig:heart}
+\end{figure}
 
-At the fault recovery, the Master server (M) will issue a notification to the Object Servers (S) asking to rearrange, so that the Object Servers (S) go through the list of objects which it is responsible and apply the modulo function again according to the new Object server count. All the Object Servers (S) process this action simultaneously and the object movement among servers will stabilize the system. Once the system is stable, the Master (M) will issue another notification to the Object Servers to invalidate the current replica object set and replicate the new object set. After this replication step the system becomes stable and the Master Server (M) starts to issue TIDs again. Furthermore, if a new server is added to the system, exactly the same steps mentioned above will be followed by the system.
+\begin{figure}
+\centering
+\includegraphics[scale=0.3]{failure.eps}
+\caption{Failure of one of the Object Servers}
+\label{fig:fail}
+\end{figure}
+
+Once the server receive the new group membership list, it redistributes the objects among the other servers while
+ new TIDs cannot be issued during this time. Figure \ref{fig:resh} displays the steps occuring during such a
+redistribution of objects.  
+\begin{figure}
+\centering
+\includegraphics[scale=0.3]{reshuffle.eps}
+\caption{Reshuffling of objects}
+\label{fig:resh}
+\end{figure}
 
 %------------------------------------------------------------------------- 
 \SubSection{Coordinator/Master responsiblities}
 \label{subsec:respon}
-
+%TODO: should we still keep this subsection?
 The Coordinator's responsabilities and interface are different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and processes, the Coordinator can be any of the Servers, thus reducing the Master's load. The list of servers available to the Client is supplied by the Master and it's updated with every server group membership change.
 
 The Coordinator's responsibilities below are shared in both scenarios:
