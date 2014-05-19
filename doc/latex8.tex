@@ -64,83 +64,114 @@ transaction management and Client-Server communication
 The assumption made for all the sections below is that the Master is a perfect process. 
 The names Object Servers and Servers are used interchangeably and refer to any non-Master and non-Client process
  that participates in a transaction.
-The Master also acts as the{\it Coordinator} for handling transactions and {\it Replica Manager} for eagerly replicating
+The Master also acts as the{\it Coordinator} for handling transactions and{\it Replica Manager} for eagerly replicating
 objects among the Object Servers. The main assumption is that the Master does not fail, only Object Servers do.
 
-Subsection \ref{subsec:repl} details the replication steps when a commit occurs, Subsection \ref{subsec:grmemb} lists the details of redistribution of objects among servers after a node fails or joins. Further details on the reponsibilities of the Coordinator/Master are in Subsection \ref{subsec:respon}.
+Subsection \ref{subsec:repl} details the replication steps when a commit occurs, 
+Subsection \ref{subsec:grmemb} lists the details of redistribution of objects among servers after a server fail or join. 
+Further details on the reponsibilities of the Coordinator/Master are in Subsection \ref{subsec:respon}.
 %------------------------------------------------------------------------- 
 \SubSection{Replication}
 \label{subsec:repl}
-As illustrated in Figure \ref{fig:perf}, the Master server {\it(M)} is used by the Object Servers {\it(S)} when bootstrapping. Information such as
-IP address and port number of the Server is stored by the Master which, then, issues unique identifiers for each Server. Once the Object Server (S) has been issued an identifier and notified the Master of joining the group of available servers, it can be connected by Clients {\it(C)} for handling transactions. Transaction identifiers (TID) should be unique to the whole system therefore the Master server (M) will keep track of the global sequence of TIDs.
+Information such as IP address and port number of the Server is stored by the Master which, then, issues unique identifiers for each Server. 
+Once the Object Server has been issued an identifier and notified the Master of joining the group of available servers, 
+it can be connected by Clients for handling transactions. Transaction identifiers (TID) should be unique to the whole system 
+therefore the Master server will keep track of the global sequence of TIDs.
 
-\begin{figure}
-\centering
-\includegraphics[scale=0.3]{replication.eps}
-\caption{RM: Replication Manager; S: Object Server; R: Replica Server}
-\label{fig:repl}
-\end{figure}
-
-When the Coordinator (depicted as the Replica Manager in Figure \ref{fig:repl}) receives a
-\texttt{Commit} call along with the Transaction ID, and the list of UIDs, it is calling 
-the workers' \texttt{GetReplicaPadInts} to retrieve a dictionary of PadInt objects which is used
-to call the replica's \texttt{UpdateReplica} method. Once the replication is completed, the Coordinator
-returns from the transaction and notifies the client of the commit's result (True or False).
-%TODO: David add more details if you feel like
+When the Coordinator receives a \texttt{Commit} call along with the Transaction ID,
+ and the list of UIDs, it will update each workers' replica. Once the replication is completed,
+ the Coordinator returns from the transaction and notifies the client of the commit's result.
 
 %------------------------------------------------------------------------- 
-\SubSection{Group Membership Change}
+\SubSection{Group Membership Change/Stabilization}
 \label{subsec:grmemb}
-Since the Master server also assumes the role of a Failure Detector - refer to Figure \ref{fig:heart},
- upon observing a node failure, it updates its list of available workers and pushes it to the workers.
- The workers, upon receiving the list initiate the{\it redistribution} of objects procedure. 
+Since the Master server also assumes the role of a failure detector,
+ upon observing a node failure, it updates its list of available workers
+ and sends it to the workers. The{\it Coordinator} calls the \texttt{Stabilizer()},
+ which monitors existing transactions and makes sure that they finalize.
 
+The following steps are taken once failure is detected: 
+\begin{enumerate}
+\item the Coordinator no longer issues TIDs for upcoming requests
+\item the Coordinator commits or aborts the existing, in-flight, transactions
+\item the replica server names list along with the group view (or server list) is updated, 
+then sent to servers
+\item \texttt{Shuffle()} is executed to redistribute its allotted objects and the respective replica objects 
+\item misplaced (now outdated) replica objects are cleared
+\item upon the completion of all the above steps, once there is a stable group membership, 
+the Coordinator will be issuing new TIDs
+\end{enumerate}
 
-\begin{figure}
-    \centering
-    \begin{subfigure}[b]{0.3\textwidth}
-        \includegraphics[scale=0.2]{heartbeat.eps}
-        \caption{Periodic heartbeats sent to the Coordinator}
-        \label{fig:heart}
-    \end{subfigure}
+The pending, in-flight transactions, are given a few seconds in order to commit. 
+Once the the timeout period has passed, the Coordinator aborts the pending transactions in order to 
+stabilize the system.
 
-    \begin{subfigure}[b]{0.3\textwidth}
-        \includegraphics[scale=0.2]{failure.eps}
-        \caption{Failure of one of the Object Servers}
-        \label{fig:fail}
-    \end{subfigure}
-  
-    \begin{subfigure}[b]{0.3\textwidth}
-        \includegraphics[scale=0.2]{reshuffle.eps}
-        \caption{Reshuffling of objects}
-        \label{fig:resh}
-    \end{subfigure}
-\end{figure}
-
-Once the server receive the new group membership list, it redistributes the objects among the other servers while
- new TIDs cannot be issued during this time. Figure \ref{fig:resh} displays the steps occuring during such a
-redistribution of objects.
 %------------------------------------------------------------------------- 
 \SubSection{Coordinator/Master responsiblities}
 \label{subsec:respon}
-%TODO: should we still keep this subsection?
-The Coordinator's responsabilities and interface are different for the two scenarios (perfect and fault-tolerant) detailed in Section \ref{sec:arch}. For instance, assuming perfect links and processes, the Coordinator can be any of the Servers, thus reducing the Master's load. The list of servers available to the Client is supplied by the Master and it's updated with every server group membership change.
+% merged the coordinator and master sections here
+The Master server's responsibilities, from bootstrapping the servers to detecting failures and joins,
+ plays an central role in the architecture and is the backbone for handling transactions.
+As a failure detector, the Master server receives periodic heartbeat timestamps from servers, stores them and, periodically,
+ checks the difference between the last timestamp and current time to determine whether a server has failed.
 
-The Coordinator's responsibilities below are shared in both scenarios:
-\begin{itemize}[noitemsep,nolistsep]
-\item assign a transaction identifier to the Client 
-\item handle abort and commit commands from the Client or Object Servers 
-\item interface with the participant servers in the transaction during the voting and commit phases 
-\end{itemize}
+As the Coordinator, it issues TIDs for all the clients. The TID is the current date and time converted into ticks, resulting in a 
+(long) value. To assure unicity, even if the generation of TIDs generation code is synchronized, the thread
+issuing TIDs will also sleep for one millisecond. Thus, avoiding any possibility of issuing the same TID to different clients.
+The issued TIDs are being tracked in order to monitor the current active transactions of the whole system. 
+Once a transaction aborts or commits the TIDs are no longer tracked/removed. 
 
-The Master also assumes the role of a failure detector through the use of heartbeat messages. In the fault-tolerant environment, the Master also assumes the Coordinator role.
+Once a server failure has been detected, the{\it stabilisation} of objects begins - as detailed in
+Section \cite{subsec:grmemb}.
+
+\SubSection{Object Server}
+\label{subsec:objserv}
+The Object Servers are the location of PadInt objects. This objects held in different servers
+are manipulated by different clients via different read/write operation requests issued by 
+different clients.
+
+The timestamp ordering prevents deadlocks among transaction, but there is a chance to have
+long waits if a certain client begins a transaction, processes different requests but does not 
+commit. To prevent other clients from waiting, a periodic inspection on the tentative writes to calculate
+its lifespan in the tentative list is used. Assuming that a certain transaction should not exceed
+a certain time period, we included a timeout so that it will abort that long running transaction. 
+
+Furthermore, \texttt{Freeze} and \texttt{Fail} functions were also implemented to test the system verifiable with different use cases. 
+For the implementation of \texttt{Freeze}, we did a trick which solved lot of synchronization issues, by
+ making use of \texttt{Monitors.Wait}. Once a server has been issued a read/write by the client, 
+the server will execute the operation as normal, but instead of returning, it waits. 
+To wake up all the operations issued by the client, the client can use the \texttt{recover}.
+The implementation of \texttt{Fail} consists in having the server no longer sending heartbeats to the Master.
+Thus, the Master server, upon its periodic timestamp difference check will identify the failed server.
+ 
+
+\SubSection{Client}
+\label{subsec:client}
+Through this proxy for the actual client application accesses the PadInt objects stored in the servers. 
+Its exposed API meets the specification requirements and are necessary in order to 
+successfully complete a transaction. 
+ 
+It asks the Coordinator for the TID and loads the latest (Object Server) View from the Master,
+ if it identified that the View has been changed.
+
+The view change is detected by appending the current view's timestamp at the end of eached retrieved TID. 
+The Client stores each retrieved views' timestamp and compares it with the one attached to a newly issued TID. 
+If they're different, it loads the new, latest, (Object Server) view (or map, or list) from the Master. 
+
+The newly updated server map is used for deciding which of the worker servers should hold which PadInt created 
+by the client application. 
+Moreover, this component keeps track of the UIDs accessed by a certain transaction and pass this list along
+ with the transaction commit/abort requests, so that the coordinator can only consult the relevant object servers
+ without probing every server.
+
+
 %------------------------------------------------------------------------- 
 \Section{Algorithms}
 \label{sec:algor}
 %------------------------------------------------------------------------ 
 \SubSection{Communication}
-The following sequence diagram depicts the communication between the client, coordinator and object servers,
-assuming no failures or joins (any group membership change). 
+The sequence diagram, in Figure \ref{fig:seqd}, depicts the communication between the client, coordinator and object servers,
+assuming no failures or joins - any group membership change. 
 
 \begin{figure*}
 \centering
@@ -152,15 +183,7 @@ assuming no failures or joins (any group membership change).
 %------------------------------------------------------------------------- 
 \SubSection{Transaction Management and Concurrency Control}
 \label{subsec:transmgt}
-The {\it Flat Transaction} model allows for a client to manipulate objects on multiple servers in a single transaction. With regards to concurrency control, {\it Timestamp Ordering} will be used for this project. Figure \ref{fig:flat} illustrates a flat transaction model setup with a transaction being executed from the client on 3 servers.
-
-\begin{figure}
-\centering
-\includegraphics[scale=0.2]{flat-transaction.eps}
-\caption{Flat Transaction model between a Client and 3 Servers}
-\label{fig:flat}
-\end{figure}
-
+The {\it Flat Transaction} model allows for a client to manipulate objects on multiple servers in a single transaction. With regards to concurrency control, {\it Timestamp Ordering} will be used for this project. 
 
 The advantages of choosing {\it Timestamp Ordering} over {\it Two-Phase Locking} or {\it Optimistic Concurrency} options are the following: 
 \begin{itemize}[noitemsep, nolistsep]
@@ -169,28 +192,11 @@ The advantages of choosing {\it Timestamp Ordering} over {\it Two-Phase Locking}
 \item Faster conflict resolution when compared to locking - transactions are aborted immediately.
 \end{itemize}
 
-Figure \ref{fig:transa} illustrates the steps between the Client, Coordinator, Master and Object Serves during a transaction. The steps below offer more details on the communication that occurs in a perfect setup: 
-
-\begin{itemize}[noitemsep, nolistsep]
-\item {\bf Steps 3-4:} Client acquires transaction ID from the Coordinator 
-\item {\bf Step 5:} Client passes TID to the Object Server
-\item {\bf Step 6:} Object Server calls the Coordinator's {\it inteface}
-\item {\bf Steps 7-8:} Client manipulates objects directly on the Object Server
-\item {\bf Step 9:} Upon transaction end, Client asks the Coordinator to either {\it Abort} or {\it Commit} 
-\item {\bf Step 10:} Coordinator will request each participant server in the transaction to indicate whether it can commit a transaction or not.{\it (Voting Phase)}
-\item {\bf Step 12:} If all participants answer/vote {\it positively}, the Coordinator issues {\it doCommit(TID)} for each parcipant to commit its part of the transaction
-\item {\bf Steps 13-14:} Once completed, all servers acknowledge the commit and Coordinator notifies the Client that it's successful
-\item Should any of the participant servers be unable or disagree to commit and aborts, the Coordinator will request all the remaining participants to abort. Client will then be notified.
-\end{itemize}
-
-\begin{figure}
-\centering
-\includegraphics[scale=0.2]{transaction.eps}
-\caption{Transaction steps between the Client, Master, Coordinator and Servers. The dotted lines represent the 2-phase distributed commit}
-\label{fig:transa}
-\end{figure}
-
-
+Figure \ref{fig:seqd} illustrates the steps between the Client, Coordinator and Object Serves during a transaction, 
+with {\it write} and {\it read} operations, followed by a commit. Once a commit request is received, it will follow 
+the two-phase commit protocol and, in addition, it will contact the replica manager to replicate the latest commit
+value returned at the end of the two phase commit. Once replication is completed the result of the commit({\bf True}
+or {\bf False}) is returned. Thus, the replication model is {\it Eager primary backup}. 
 
 %-------------------------------------------------------------------------
 \SubSection{Timestamp Ordering and Deadlock Detection}
@@ -206,29 +212,27 @@ last written by an earlier transaction.}\cite{coulouris2005distributed}. Each tr
 Since transactions only wait for earlier ones (thus, no cycle occurs in the wait-for graph), no deadlocks occur.
 
 Conflict resolution is performed at each operation. If the resolution is to abort the transaction the Coordinator is informed and it will abort the transaction for all the participants.
+Finally, we integrated the above implemented components in order to achieve the fault-tolerant, 
+replicated, and distributed software transactional memory.
 
-%--------------------------------------------------------------------------
-\SubSection{Replication}
-\label{subsec:faultol}
-The fault tolerant design supports failure of a single Object Server. It extends the perfect architecture by assuring the replication of objects in the adjacent server.
-For instance, the object stored in Object Server S1 keeps a copy in S2 as a replica. The Master server is responsible for keeping track of the replica servers.\\
 
-When an Object Server {\bf fails}:
-\begin{enumerate}[noitemsep, nolistsep]
-\item Master detects the failure from the absence of heartbeat messages from the server
-\item Master server issues a {\it “failure warning notification”} to the other servers, so that the current transactions related to the absent server be aborted.
-Others will continue but new transactions will not be accepted. (Master no longer issuing TIDs)
-\item Master coordinates the object replication so that the currently available servers share the objects held by the absent server.
-\item Once the Master notifies all the servers about the new, stable status, transactions can be take place again.\\
-\end{enumerate}
+\Section{Evaluation}
 
-When the failed server {\bf recovers}:
-\begin{enumerate}[noitemsep, nolistsep]
-\item Master detects the arrival of a new server
-\item Master server issues a {\it “New server notification”} for the servers. Once the current pending transactions are completed, servers are stabilized
-\item Master server coordinates object replication such that a portion of objects in the current system will be transferred to the new server
-\item Once the Master notifies all servers of the stabilized status, transactions can be resumed
-\end{enumerate}
+\begin{figure}
+\centering
+\includegraphics[scale=0.4]{withonefailure.eps}
+\caption{Out of 600 transactions, 200 by each server, normalized results of 3 simulations}
+\label{fig:onef}
+\end{figure}
+
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.4]{nofailures.eps}
+\caption{Out of 600 transactions, 200 by each server, normalized results of 3 simulations}
+\label{fig:noff}
+\end{figure}
+
 
 %------------------------------------------------------------------------- 
 \Section{Conclusion}
@@ -247,4 +251,3 @@ Finally, we believe that the concepts we came across in the discussion of this p
 
 %------------------------------------------------------------------------- 
 \end{document}
-
