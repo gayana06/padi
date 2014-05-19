@@ -15,6 +15,7 @@
 \usepackage{enumitem}
 \usepackage[font=small]{caption}
 \usepackage[utf8]{inputenc}
+\usepackage{subcaption}
 
 %\documentstyle[times,art10,twocolumn,latex8]{article}
 
@@ -32,7 +33,11 @@
 
 \begin{abstract}
    The present report describes the implementation details of a fault-tolerant,
-   replicated, distributed software transactional memory.
+   replicated, distributed software transactional memory. Performance of protocol is
+   evaluated through latency and bandwidth required, overall throughput, load balancing
+   of data storage and processing.
+   Furthermore, a critical assessment of the quality of the protocol and future work is 
+   also provided. 
 \end{abstract}
 
 %------------------------------------------------------------------------- 
@@ -88,32 +93,33 @@ returns from the transaction and notifies the client of the commit's result (Tru
 \label{subsec:grmemb}
 Since the Master server also assumes the role of a Failure Detector - refer to Figure \ref{fig:heart},
  upon observing a node failure, it updates its list of available workers and pushes it to the workers.
- The workers, upon receiving the list initiate the \it{redistribution} of objects procedure. 
+ The workers, upon receiving the list initiate the{\it redistribution} of objects procedure. 
+
 
 \begin{figure}
-\centering
-\includegraphics[scale=0.3]{heartbeat.eps}
-\caption{Periodic heartbeats sent to the Coordinator}
-\label{fig:heart}
-\end{figure}
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[scale=0.2]{heartbeat.eps}
+        \caption{Periodic heartbeats sent to the Coordinator}
+        \label{fig:heart}
+    \end{subfigure}
 
-\begin{figure}
-\centering
-\includegraphics[scale=0.3]{failure.eps}
-\caption{Failure of one of the Object Servers}
-\label{fig:fail}
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[scale=0.2]{failure.eps}
+        \caption{Failure of one of the Object Servers}
+        \label{fig:fail}
+    \end{subfigure}
+  
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[scale=0.2]{reshuffle.eps}
+        \caption{Reshuffling of objects}
+        \label{fig:resh}
+    \end{subfigure}
 \end{figure}
 
 Once the server receive the new group membership list, it redistributes the objects among the other servers while
  new TIDs cannot be issued during this time. Figure \ref{fig:resh} displays the steps occuring during such a
-redistribution of objects.  
-\begin{figure}
-\centering
-\includegraphics[scale=0.3]{reshuffle.eps}
-\caption{Reshuffling of objects}
-\label{fig:resh}
-\end{figure}
-
+redistribution of objects.
 %------------------------------------------------------------------------- 
 \SubSection{Coordinator/Master responsiblities}
 \label{subsec:respon}
@@ -133,35 +139,15 @@ The Master also assumes the role of a failure detector through the use of heartb
 \label{sec:algor}
 %------------------------------------------------------------------------ 
 \SubSection{Communication}
-The following communication occurs {\bf before} the Client attempts connection to the Master node - between the Master and the Servers.
+The following sequence diagram depicts the communication between the client, coordinator and object servers,
+assuming no failures or joins (any group membership change). 
 
-\begin{enumerate}
-\item Master boots, followed by the Object Servers bootstrapping
-\item During Object Servers bootstrap:
-\begin{itemize}[noitemsep, nolistsep]
-\item Master identifies the Object Servers trying to connect
-\item Master assigns a unique name to the Object Servers to later be used as a reference
-\end{itemize}
-\item Object Servers's heartbeat messages periodically being sent to Master. Heartbeats are also used for replica management in the faul-tolerant scenario. Should one of the replicas fail, the objects are replicated in another server in order to maintain a certain level of availability in the system.
-\end{enumerate}
-
-Upon {\it attempting a transaction} the following communication exists between the Client, Master and Object Servers in a {\bf fault-tolerant} environment: 
-\begin{enumerate}
-\item Client connects to the Master and requests a transaction identifier 
-\item Master maintains a global transaction sequence and returns a unique transaction identifier (TID) to the Client. Furthermore, a list of healthy Object Servers is also returned to the Client. 
-\item Client generates a unique ID (integer) when generating the object and also be used in order to select an available server from the list (used in a modulo function)
-\item Client uses the modulo result to connect to the Object Server and store the object representing the tentative versions of the transaction.
-\end{enumerate}
-
-The main difference between the above steps and the communication in a {\bf perfect} environment is that the TID is not necessarily assigned by the Master, but any of the Servers.
-
-When the Client attempts to {\bf manipulate an existing object} in the {\it perfect} environment, the following communication takes place:
-\begin{enumerate}
-\item Client requests and retrieves TID from Master
-\item Client retrieves object's previously generated unique ID
-\item Client applies modulo on the retrieved ID to locate the relevant Object Server to request for reference
-\item With the retrieved object reference, client can manipulate the object value
-\end{enumerate}
+\begin{figure*}
+\centering
+\includegraphics[scale=0.25]{seqDiaCommSteps.eps}
+\caption{Communication between the client, coordinator and servers during a transaction}
+\label{fig:seqd}
+\end{figure*}
 
 %------------------------------------------------------------------------- 
 \SubSection{Transaction Management and Concurrency Control}
